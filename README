@@ -1,0 +1,22 @@
+Azimuthal Map Creator
+by Tom Epperly NS6T
+tepperly@gmail.com
+
+LICENSE
+
+The azimuthal map generator is released under the GNU Affero General Public
+License version 3.0. See agpl-3.0.txt for details of the terms of use.
+
+DESCRIPTION
+
+An azimuthal map shows the correct bearing and distance for locations
+from a reference point. These maps are useful for ham radio operators
+who can use it to determine which way to point their antennas.
+
+DEPENDENCIES
+This project requires the following Ruby libraries:
+
+     color   	      1.4.0  	http://rubyforge.org/project/color
+     pdf-writer	      1.1.8	http://rubyforge.org/project/ruby-pdf/
+     transaction      1.4.0     http://rubyforge.org/projects/trans-simple/
+     sqlite3	      1.3.1	http://rubyforge.org/projects/sqlite-ruby
