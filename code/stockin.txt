@@ -1,0 +1,7 @@
+paper=4A0
+location=CM97dr
+bluefill=on
+uscities=on
+bw=off
+latlong=on
+gridsquares=on
