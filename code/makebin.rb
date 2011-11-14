@@ -29,6 +29,7 @@ def pathType(genType, specType)
 end
 
 def convertFile(src, dest)
+  comment = /^\s*\#/
   section = /^(Path|Open)\s+(\d+)\s+(Lake|Land|Island)?\s*("([^"]*)")?\s*$/
   coordinate = /^\s+(-?\d+\.\d+)\s+(-?\d+\.\d+)\s*$/
   File.open(src, "r") { |input|
@@ -38,6 +39,8 @@ def convertFile(src, dest)
             output.write([0x7ffffff0 | pathType(md[1],md[3]), md[2].to_i].pack("NN"))
         elsif (md = coordinate.match(line))
           output.write([(md[1].to_f * 1000000.0).to_i, (md[2].to_f * 1000000.0).to_i].pack("NN"))
+        elsif (comment.match(line))
+          # ignore
         else
           print "Unmatched: " + line
         end

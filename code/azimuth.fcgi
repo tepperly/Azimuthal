@@ -1178,25 +1178,28 @@ class AzimuthWriter
   end
 
   def labelSites(inf, fontsize, dotsize, extra_space, obscured, cutoff)
+    comment = /^\s*\#/
     while (line = inf.gets)
-      stateInfo = line.split("|")
-      if (stateInfo[2].to_i >= cutoff)
-        polar = $ad.calc(stateInfo[3].to_f * DEGTORAD,
-                         stateInfo[4].to_f * DEGTORAD,
-                         @latitude, @longitude)
-        if polar[0] < @radius
-          ps = toPSCoord(polar)
-          textRadius = 0.55*@pdfwriter.text_width(stateInfo[0], fontsize)
-          bb = [[ps[0] - 0.83333333*textRadius - extra_space,
-                 ps[1] - dotsize - extra_space],
-                [ps[0] + 0.83333333*textRadius + extra_space,
-                 ps[1] + 1.25*dotsize + fontsize + extra_space]]
-          if isClear(obscured, ps[0], ps[1], bb)
-            obscured.push([ps[0], ps[1], bb])
-            @pdfwriter.circle_at(ps[0], ps[1], dotsize).fill
-            @pdfwriter.add_text(ps[0] - 0.8333333*textRadius, 
-                                ps[1] + 1.25*dotsize,
-                                stateInfo[0], fontsize)
+      if (not comment.match(line))
+        stateInfo = line.split("|")
+        if (stateInfo[2].to_i >= cutoff)
+          polar = $ad.calc(stateInfo[3].to_f * DEGTORAD,
+                           stateInfo[4].to_f * DEGTORAD,
+                           @latitude, @longitude)
+          if polar[0] < @radius
+            ps = toPSCoord(polar)
+            textRadius = 0.55*@pdfwriter.text_width(stateInfo[0], fontsize)
+            bb = [[ps[0] - 0.83333333*textRadius - extra_space,
+                   ps[1] - dotsize - extra_space],
+                  [ps[0] + 0.83333333*textRadius + extra_space,
+                   ps[1] + 1.25*dotsize + fontsize + extra_space]]
+            if isClear(obscured, ps[0], ps[1], bb)
+              obscured.push([ps[0], ps[1], bb])
+              @pdfwriter.circle_at(ps[0], ps[1], dotsize).fill
+              @pdfwriter.add_text(ps[0] - 0.8333333*textRadius, 
+                                  ps[1] + 1.25*dotsize,
+                                  stateInfo[0], fontsize)
+            end
           end
         end
       end
