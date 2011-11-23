@@ -804,7 +804,7 @@ class AzimuthWriter
 
   def frame
     @pdfwriter.save_state
-    style = PDF::Writer::StrokeStyle.new(thickline)
+    style = PDF::Writer::StrokeStyle.new(2*thickline)
     @pdfwriter.stroke_style(style)
     @pdfwriter.fill_color!(Color::RGB::Black)
       @pdfwriter.translate_axis(@center[0], @center[1])
@@ -816,21 +816,22 @@ class AzimuthWriter
       s = Math::sin(r)
       c = Math::cos(r)
       if ((i % 10) == 0)
-        label = ((90 - i) % 360).to_s + "\260"
-        w = @pdfwriter.text_width(label, labelsize)
-        x = (outer+0.5*thickline) * c
-        y = (outer+0.5*thickline) * s
-        if i == 0 or i == 180
-          y = y - 0.5*labelsize
-        elsif i > 180
-          y = y - labelsize
+        numstr = ((90 - i) % 360).to_s 
+        label = numstr + "\260"
+        w = 0.5*@pdfwriter.text_width(numstr, labelsize)
+        if i <= 180
+          tangle =  (i-90)%360
+          x = (outer+0.7*thickline) * c - w*Math::cos(tangle*DEGTORAD)
+          y = (outer+0.7*thickline) * s - w*Math::sin(tangle*DEGTORAD)
+          @pdfwriter.add_text(x,y,label,labelsize,angle=tangle)
+        else
+          tangle =  (90+i)%360
+          x = (outer+0.7*thickline + 0.8*labelsize) * c - 
+            w*Math::cos(tangle*DEGTORAD)
+          y = (outer+0.7*thickline + 0.8*labelsize) * s -
+            w*Math::sin(tangle*DEGTORAD)
+          @pdfwriter.add_text(x,y,label,labelsize,angle=tangle)
         end
-        if i == 90 or i == 270
-          x = x - 0.5*w
-        elsif i > 90 and i < 270
-          x = x - 0.9*w
-        end
-        @pdfwriter.add_text(x, y, label, labelsize)
         @pdfwriter.stroke_style(style)
       end
       @pdfwriter.move_to(@printRadius*c, @printRadius*s)

@@ -1,4 +1,4 @@
-paper=4A0
+paper=LETTER
 location=CM97dr
 bluefill=on
 uscities=on
