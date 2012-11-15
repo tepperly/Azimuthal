@@ -2,6 +2,7 @@ paper=LETTER
 location=CM97dr
 bluefill=on
 uscities=on
+prefixlabels=on
 bw=off
 latlong=on
 gridsquares=on

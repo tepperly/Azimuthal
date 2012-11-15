@@ -520,6 +520,16 @@ class AzimuthWriter
     156
   end
 
+  def prefixsize
+    size = 3.0*(@printRadius / 260.0)
+    STDFONTSIZES.each { |std|
+      if std > size
+        return std
+      end
+    }
+    156
+  end
+
   def titlefontsize
     size = 32.0*(@printRadius / 260.0)
     STDFONTSIZES.each { |std|
@@ -1220,6 +1230,39 @@ class AzimuthWriter
     return 0
   end
 
+  def labelPrefixes
+    @pdfwriter.save_state
+    @pdfwriter.fill_color!(Color::RGB::Black)
+    style = PDF::Writer::StrokeStyle.new(0.5*thinnestline)
+    @pdfwriter.stroke_style(style)
+    @pdfwriter.stroke_color!(Color::RGB::White)
+    @pdfwriter.select_font("Helvetica")
+    @pdfwriter.text_render_style(2) # fill and then stroke
+    File.open("cty.dat") { |inf|
+      while (line = inf.gets)
+        latitude = line[39,8].strip.to_f
+        longitude = -(line[48,8].strip.to_f)
+        prefix = line[69..-1].strip.chop
+        if prefix[0] == "*"
+          prefix = prefix[1..-1]
+        end
+        polar = $ad.calc(latitude*DEGTORAD, longitude*DEGTORAD, @latitude, @longitude)
+        if polar[0] <= @radius
+          psc = toPSCoord(polar)
+          xadjust = -0.5*@pdfwriter.text_width(prefix, prefixsize)
+          @pdfwriter.add_text(psc[0]+xadjust, psc[1], prefix, prefixsize)
+        end
+
+        while (line = inf.gets)
+          if line =~ /;\s*$/
+            break
+          end
+        end
+      end
+    }
+    @pdfwriter.restore_state
+  end
+
   def labelCities
     extra_space = 1
     @pdfwriter.fill_color!(Color::RGB::Black)
@@ -1529,6 +1572,9 @@ def handleRequest(cgi)
         end
         if "on" == cgi["uscities"]
           foo.labelCities
+        end
+        if "on" == cgi["prefixlabels"]
+          foo.labelPrefixes
         end
         headers = { "type" => "application/octet" }
         if "on" == cgi["view"]
