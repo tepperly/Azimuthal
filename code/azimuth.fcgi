@@ -137,27 +137,55 @@ class FileReader
     end
   end
 
-  def nextSegment
-    while (line = nextInt)
-      if line == 0x7ffffff4
-        @current = nil
-        @prev = nil
-        @ptBuffer = [ ]
-        return nextInt
+  def segmentHeader
+    while(line = nextInt)
+      if (line == 0x7ffffff4)
+        pathNum = nextInt
+        lat = nextInt.to_f/1000000.0
+        long = nextInt.to_f/1000000.0
+        radius = nextInt
+        distbearing = $ad.calc(lat, long, @latitude, @longitude)
+        if ((@radius+radius) >= distbearing[0]) 
+          return pathNum
+        end
       end
+    end
+    return nil
+  end
+
+  def nextSegment
+    while (pathNum = segmentHeader)
+      @current = nil
+      @prev = nil
+      @ptBuffer = [ ]
+      return pathNum
     end
   end
 
   PATHTYPES = [ 'Unknown', 'Lake', 'Land', 'Island', 'Open' ]
 
-  def nextPath
+  def pathHeader
     while(line = nextInt)
       if (line == 0x7ffffff0) or (line == 0x7ffffff1) or (line == 0x7ffffff2) or (line == 0x7ffffff3)
+        pathNum = nextInt
+        lat = nextInt.to_f/1000000.0
+        long = nextInt.to_f/1000000.0
+        radius = nextInt
+        distbearing = $ad.calc(lat, long, @latitude, @longitude)
+        if ((@radius+radius) >= distbearing[0]) 
+          return [ line, pathNum ]
+        end
+      end
+    end
+    return nil
+  end
+
+  def nextPath
+    while (header = pathHeader)
         @current = nil
         @prev = nil
         @ptBuffer = [ ]
-        return [nextInt, PATHTYPES[line & 0xf], ""]
-      end
+        return [header[1], PATHTYPES[header[0] & 0xf], ""]
     end
     return nil
   end
@@ -1549,13 +1577,13 @@ def handleRequest(cgi)
                                 "on"==cgi["bw"])
 
         
-        File.open("corrected.bin") { |inf|
+        File.open("corrected.azb") { |inf|
           foo.traceFile(inf)
         }
-        File.open("nations.bin") { |inf|
+        File.open("nations.azb") { |inf|
           foo.traceLines(inf)
         }
-        File.open("states.bin") { |inf|
+        File.open("states.azb") { |inf|
           foo.traceLines(inf)
         }
         if "on" == cgi["latlong"]
