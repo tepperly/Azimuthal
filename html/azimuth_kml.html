@@ -1,0 +1,238 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+   "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<!-- $Id: azimuth.html 164 2011-04-20 01:33:45Z tepperly $ -->
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=iso-8859-1" >
+<link rel="shortcut icon" href="/favicon.ico" >
+<title>NS6T's Azimuthal Map</title>
+<script type="text/javascript">
+<!--
+
+function initialize(geoDict){
+  latitude=geoDict['Latitude'];
+  longitude=geoDict['Longitude'];
+  glocation = latitude + ", " + longitude;
+  document.forms["mapform"].elements["location"].value = glocation;
+  document.forms["mapform"].elements["iplocationused"].value = "true";
+  setCookie('geolocation',glocation,14);
+}
+ 
+function getCookie(c_name){
+  if (document.cookie.length>0){
+    c_start=document.cookie.indexOf(c_name + "=");
+    if (c_start!=-1){
+      c_start=c_start + c_name.length+1;
+      c_end=document.cookie.indexOf(";",c_start);
+      if (c_end==-1) c_end=document.cookie.length;
+      return unescape(document.cookie.substring(c_start,c_end));
+    }
+  }
+  return "";
+}
+ 
+function setCookie(c_name,value,expiredays){
+  var exdate=new Date();
+  exdate.setDate(exdate.getDate()+expiredays);
+  document.cookie=c_name+ "=" +escape(value)+
+  ((expiredays==null) ? "" : ";expires="+exdate.toGMTString());
+}
+ 
+function checkCookie(){
+  geolocation=getCookie('geolocation');
+  if (!geolocation){
+    script = document.createElement('script')
+    script.src = "http://ipinfodb.com/ip_query.php?output=json&callback=initialize&timezone=false";
+    document.body.appendChild(script)
+  }
+  else {
+    document.forms["mapform"].elements["location"].value = geolocation;
+    document.forms["mapform"].elements["iplocationused"].value = "true";
+  }
+}
+
+
+function popup(mylink, windowname)
+{
+if (! window.focus)return true;
+var href;
+if (typeof(mylink) == 'string')
+   href=mylink;
+else
+   href=mylink.href;
+window.open(href, windowname, 'width=500,height=300,scrollbars=yes');
+return false;
+}
+//-->
+</script>
+</head>
+<body>
+<h1>Request an Azimuthal Map</h1>
+<div style="float: left;">
+<script type="text/javascript"><!--
+google_ad_client = "pub-0877384235008480";
+/* 160x600, created 2/25/10 */
+google_ad_slot = "4698986271";
+google_ad_width = 160;
+google_ad_height = 600;
+//-->
+</script>
+<script type="text/javascript"
+src="http://pagead2.googlesyndication.com/pagead/show_ads.js">
+</script>
+</div>
+<div>
+<img src="azimuthal_map.png" 
+     width="199" height="186" 
+     title="Example map"
+     style="float: right;" alt="Example map">
+<form enctype="multipart/form-data" method="post" 
+      action="code/azimuth.fcgi" name="mapform" >
+<table summary="Form to request a map">
+<tr><td align="right">Title:</td>
+<td colspan="3"><input type="text" name="title" value="Azimuthal Map" size="50" maxlength="30" >
+</td>
+</tr>
+<tr>
+<td align="right">Location:</td>
+<td> <input type="text" name="location" > (<a href="location_help.html" onClick="return popup(this, 'Location Help')">help</a>)</td>
+<td align="right">Label countries:</td>
+<td><input type="checkbox" checked="checked" name="countries" ></td></tr>
+<tr>
+<td align="right">Distance:</td>
+<td> <input type="text" name="distance" >  (<a href="distance_help.html" onClick="return popup(this, 'Distance Help')">help</a>)</td>
+<td align="right">Label NA states:</td>
+<td><input type="checkbox" checked="checked" name="states" ></td></tr>
+<tr><td align="right">Paper:</td><td>
+<select name="paper">
+<option value="2A0">2A0 (118.9cm x 168.2cm)</option>
+<option value="4A0">4A0 (168.2cm x 237.8cm)</option>
+<option value="A0">A0 (84.1cm x 118.9cm)</option>
+<option value="A1">A1 (59.4cm x 84.1cm)</option>
+<option value="A2">A2 (42cm x 59.4cm)</option>
+<option value="A3">A3 (29.7cm x 42cm)</option>
+<option value="A4">A4 (21cm x 29.7cm)</option>
+<option value="A5">A5 (14.8cm x 21cm)</option>
+<option value="A6">A6 (10.5cm x 14.8cm)</option>
+<option value="A7">A7 (7.4cm x 10.5cm)</option>
+<option value="A8">A8 (5.2cm x 7.4cm)</option>
+<option value="A9">A9 (3.7cm x 5.2cm)</option>
+<option value="A10">A10 (2.6cm x 3.7cm)</option>
+<option value="ANSI A">ANSI A (8.5&quot; x 11&quot;)</option>
+<option value="ANSI B">ANSI B (11&quot; x 17&quot;)</option>
+<option value="ANSI C">ANSI C (17&quot; x 22&quot;)</option>
+<option value="ANSI D">ANSI D (22&quot; x 34&quot;)</option>
+<option value="ANSI E">ANSI E (34&quot; x 44&quot;)</option>
+<option value="B0">B0 (100cm x 141.4cm)</option>
+<option value="B1">B1 (70.7cm x 100cm)</option>
+<option value="B2">B2 (50cm x 70.7cm)</option>
+<option value="B3">B3 (35.3cm x 50cm)</option>
+<option value="B4">B4 (25cm x 35.3cm)</option>
+<option value="B5">B5 (17.6cm x 25cm)</option>
+<option value="B6">B6 (12.5cm x 17.6cm)</option>
+<option value="B7">B7 (8.8cm x 12.5cm)</option>
+<option value="B8">B8 (6.2cm x 8.8cm)</option>
+<option value="B9">B9 (4.4cm x 6.2cm)</option>
+<option value="B10">B10 (3.1cm x 4.4cm)</option>
+<option value="C0">C0 (91.7cm x 129.7cm)</option>
+<option value="C1">C1 (64.8cm x 91.7cm)</option>
+<option value="C2">C2 (45.8cm x 64.8cm)</option>
+<option value="C3">C3 (32.4cm x 45.8cm)</option>
+<option value="C4">C4 (22.9cm x 32.4cm)</option>
+<option value="C5">C5 (16.2cm x 22.9cm)</option>
+<option value="C6">C6 (11.4cm x 16.2cm)</option>
+<option value="C7">C7 (8.1cm x 11.4cm)</option>
+<option value="C8">C8 (5.7cm x 8.1cm)</option>
+<option value="C9">C9 (4cm x 5.7cm)</option>
+<option value="C10">C10 (2.8cm x 4cm)</option>
+<option value="EXECUTIVE">Executive (7.248&quot; x 10.5&quot;)</option>
+<option value="FOLIO">Folio (8.5&quot; x 13&quot;)</option>
+<option value="LETTER" selected="selected">Letter (8.5&quot; x 11&quot;)</option>
+<option value="LEGAL">Legal (8.5&quot; x 14&quot;)</option>
+<option value="RA0">RA0 (86cm x 122cm)</option>
+<option value="RA1">RA1 (61cm x 86cm)</option>
+<option value="RA2">RA2 (43cm x 61cm)</option>
+<option value="RA3">RA3 (30.5cm x 43cm)</option>
+<option value="RA4">RA4 (21.5m x 30.5cm)</option>
+<option value="SRA0">SRA0 (90cm x 128cm)</option>
+<option value="SRA1">SRA1 (64cm x 90cm)</option>
+<option value="SRA2">SRA2 (45cm x 64cm)</option>
+<option value="SRA3">SRA3 (32cm x 45cm)</option>
+<option value="SRA4">SRA4 (22.5m x 32cm)</option>
+<option value="TABLOID">Tabloid (11&quot; x 17&quot;)</option>
+</select></td>
+<td align="right">Label cities:</td>
+<td><input type="checkbox" name="uscities" ></td>
+</tr>
+<tr>
+<td>Black &amp; white:</td>
+<td><input type="checkbox" name="bw" ></td>
+<td align="right">Blue background:</td>
+<td><input type="checkbox" checked="checked" name="bluefill" ></td>
+</tr>
+<tr>
+<td align="right">Lat/long grid:</td>
+<td><input type="checkbox" name="latlong" ></td>
+<td align="right">View in browser:</td>
+<td><input type="checkbox" checked="checked" name="view" ></td>
+</tr>
+<tr>
+<td align="right">Label grids:</td>
+<td><input type="checkbox" name="gridsquares" ></td>
+<td align="right">&nbsp;</td>
+<td>&nbsp;</td>
+</tr>
+<tr>
+<td colspan="4" align="left">KML file:<input type="file" name="kmlfile" ></td>
+</tr>
+<tr>
+<td colspan="4" align="center"><button name="submit" type="submit">Create Map</button>
+<button name="calcloc" type="button"  onClick="checkCookie();" >Estimate Location</button> 
+<input type="hidden" name="iplocationused" value="false" >
+</td></tr>
+<tr><td colspan="4" align="center">Generating maps takes up to 30 seconds.</td></tr>
+</table>
+</form>
+<p> Use this form to create an azimuthal map for any location on the globe.
+  You can customize the map in a variety of ways by changing the
+  options in the web form. <strong>Report problems or successes as
+  comments on <a href="/word/?page_id=10">this page.</a></strong></p>
+<p> The location can be a latitude, longitude, a Maidenhead grid
+  square, or a city name (e.g., "51.504572,-0.268225", "IO91um", or
+  "Chicago, IL"). You can indicate North and East coordinates by using
+  a positive number or by adding "N" or "E" after the number. For
+  South and West, you can indicate these with a negative number or by
+  adding "S" or "W" after the number.
+  A Maidenhead
+  grid specification must have two upper case letters followed by two digits
+  and then optionally two lower case letters. For big cities, you can
+  enter just the city name. For other cities, enter the city and state
+  for US cities and otherwise the city and country.
+  The distance is in kilometers. More information on the program is
+  <a href="/word/?page_id=10">available</a>.</p>
+<p>
+If you think this service is worthwhile and would like to show your
+appreciation, I encourage you to make a donation to the <a
+href="http://www.largeradio.org/" target="_blank">K6LRG repeater
+and contest operation</a> (look for the donate bottom near the bottom 
+of their site). You can also help by giving this site a <a
+href="http://www.eham.net/links/rating/11241">high rating on
+eHam.net</a> or <a
+href="http://www.dxzone.com/cgi-bin/dir/rate.cgi?ID=22824">dxzone.com</a>. The names, locations, and populations of non-US cities
+were provided by <a href="http://www.world-gazetteer.com/">The World
+Gazetteer</a>.  If you have suggestions for improvements or
+constructive feedback, please leave a comment on the <a href="/word/?page_id=10#respond">blog</a>.
+<a href="http://www.facebook.com/sharer.php?u=http%3A%2F%2Fns6t.net%2Fazimuth%2Fazimuth.html&amp;t=Azimuthal+map" 
+  target="_blank" >
+<img style="border-style: none;" src="fbicon.png" alt="Share on Facebook" >
+</a>
+</p>
+ <p>
+    <a href="http://validator.w3.org/check?uri=referer"><img
+        src="http://www.w3.org/Icons/valid-html401"
+        alt="Valid HTML 4.01 Transitional" height="31" width="88"></a>
+  </p>
+<script type="text/javascript" src="http://hamradionation.com/link_js.php?user=NS6T&link_id=84"></script>
+</div>
+</body>
+</html>
