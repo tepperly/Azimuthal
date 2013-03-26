@@ -20,6 +20,7 @@
 ENV['RUBY_GEMS'] = "/home8/brightly/ruby/gems"
 require 'rubygems'
 require 'sqlite3'
+require 'tempfile'
 
 require 'pdf/writer'
 require 'color/rgb'
@@ -1491,35 +1492,47 @@ def bool(v)
 end
 
 def handleRequest(cgi)
+  cgv = { }
+  cgi.params.each { |k,v|
+    if v.instance_of?(StringIO)
+      cgv[k] = v.read
+    elsif v.instance_of?(Tempfile)
+      if v.length <= 10000000       # only up to 10 million bytes
+        cgv[k] = v.read
+      end
+    else
+      cgv[k] = v
+    end
+  }
   db = SQLite3::Database.new("mapsmade.db") 
   if db
     begin
       db.busy_timeout(150)
       db.execute("CREATE TABLE if not exists log (id integer primary key autoincrement, title text, paper text, bluefill tinyint, view tinyint, countries tinyint, cities tinyint, distance text, location text, datetime bigint, iploc tinyint, referrer text, success tinyint, blackwhite tinyint, latlonglines tinyint, gridsquarelabels tinyint)")
       db.execute("insert into log (title, paper, bluefill, view, countries, cities, distance, location, iploc, referrer, datetime, blackwhite, latlonglines, gridsquarelabels) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                 cgi['title'],
-                 cgi['paper'],
-                 bool(cgi['bluefill']),
-                 bool(cgi['view']),
-                 bool(cgi['countries']),
-                 bool(cgi['uscities']),
-                 cgi['distance'],
-                 cgi['location'],
-                 bool(cgi['iplocationused']),
-                 cgi.referer, Time.now.to_i,
-                 bool(cgi['bw']),
-                 bool(cgi['latlong']),
-                 bool(cgi['gridsquares']))
+                 cgv['title'],
+                 cgv['paper'],
+                 bool(cgv['bluefill']),
+                 bool(cgv['view']),
+                 bool(cgv['countries']),
+                 bool(cgv['uscities']),
+                 cgv['distance'],
+                 cgv['location'],
+                 bool(cgv['iplocationused']),
+                 cgv.referer, Time.now.to_i,
+                 bool(cgv['bw']),
+                 bool(cgv['latlong']),
+                 bool(cgv['gridsquares']))
       id = db.get_first_value("select last_insert_rowid()")
       
       lettersize = "LETTER"
       errors = [ ]
-      if cgi["paper"] and KNOWNPAPER[cgi["paper"]]
-        lettersize = KNOWNPAPER[cgi["paper"]]
+      if cgv["paper"] and KNOWNPAPER[cgv["paper"]]
+        lettersize = KNOWNPAPER[cgv["paper"]]
       else
-        errors << ("PAPER\nPaper argument is wrong '" + cgi["paper"] + "'\n")
+        errors << ("PAPER\nPaper argument is wrong '" + cgv["paper"] + "'\n")
       end
-      location = cgi["location"].strip
+      location = cgv["location"].strip
       if location =~ MAIDENHEADREGEX
         latlong = maidenheadToLatLong($1)
         latitude = latlong[0]
@@ -1593,17 +1606,17 @@ def handleRequest(cgi)
       else
         errors << LOCATIONHELP
       end
-      distance = cgi["distance"].to_f
+      distance = cgv["distance"].to_f
       if distance > EARTHRADIUS*Math::PI || distance == 0
         distance = EARTHRADIUS*Math::PI
       end
       
       title = "Azimuthal Map"
       
-      if not titleOkay(cgi["title"])
+      if not titleOkay(cgv["title"])
         errors << "TITLE\nTitle has illegal characters.\n"
       else
-        title = cgi["title"]
+        title = cgv["title"]
       end
 
 
@@ -1613,8 +1626,8 @@ def handleRequest(cgi)
                    0, Time.now.to_i, id)
       else
         foo = AzimuthWriter.new(distance, lettersize, latitude*DEGTORAD,
-                                longitude*DEGTORAD,"on"==cgi["bluefill"], title,
-                                "on"==cgi["bw"])
+                                longitude*DEGTORAD,"on"==cgv["bluefill"], title,
+                                "on"==cgv["bw"])
 
         
         File.open("corrected.azb") { |inf|
@@ -1626,30 +1639,29 @@ def handleRequest(cgi)
         File.open("states.azb") { |inf|
           foo.traceLines(inf)
         }
-        if cgi.has_key?("kmlfile")
-          print cgi["kmlfile"] + "\n"
-          foo.markLandmarks(cgi["kmlfile"].read)
+        if cgv.has_key?("kmlfile")
+          foo.markLandmarks(cgv["kmlfile"])
         end
-        if "on" == cgi["latlong"]
+        if "on" == cgv["latlong"]
           foo.latlonggrid
         end
-        if "on" == cgi["gridsquares"]
+        if "on" == cgv["gridsquares"]
           foo.gridsquarelabels
         end
-        if "on" == cgi["countries"]
+        if "on" == cgv["countries"]
           foo.labelCountries
         end
-        if "on" == cgi["states"]
+        if "on" == cgv["states"]
           foo.labelStates
         end
-        if "on" == cgi["uscities"]
+        if "on" == cgv["uscities"]
           foo.labelCities
         end
-        if "on" == cgi["prefixlabels"]
+        if "on" == cgv["prefixlabels"]
           foo.labelPrefixes
         end
         headers = { "type" => "application/octet" }
-        if "on" == cgi["view"]
+        if "on" == cgv["view"]
           headers["type"] = "application/pdf"
           headers["content-disposition"] = "inline; filename=AzimuthalMap.pdf"
         else
