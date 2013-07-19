@@ -1,70 +1,140 @@
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
    "http://www.w3.org/TR/html4/loose.dtd">
 <html>
-<!-- $Id: azimuth.html 164 2011-04-20 01:33:45Z tepperly $ -->
+<!-- $Id: azimuth.html 146 2010-05-06 04:27:08Z tepperly $ -->
 <head>
 <meta http-equiv="Content-Type" content="text/html;charset=iso-8859-1" >
 <link rel="shortcut icon" href="/favicon.ico" >
 <title>NS6T's Azimuthal Map</title>
 <script type="text/javascript">
 <!--
-
-function initialize(geoDict){
-  latitude=geoDict['Latitude'];
-  longitude=geoDict['Longitude'];
-  glocation = latitude + ", " + longitude;
-  document.forms["mapform"].elements["location"].value = glocation;
-  document.forms["mapform"].elements["iplocationused"].value = "true";
-  setCookie('geolocation',glocation,14);
-}
+//IPInfoDB javascript JSON query example
+//Tested with FF 3.5, Opera 10, Chome 5 and IE 8
+//Geolocation data is stored as serialized JSON in a cookie
+//Bug reports : http://forum.ipinfodb.com/viewforum.php?f=7
+function geolocate(timezone, cityPrecision, objectVar) {
  
-function getCookie(c_name){
-  if (document.cookie.length>0){
-    c_start=document.cookie.indexOf(c_name + "=");
-    if (c_start!=-1){
-      c_start=c_start + c_name.length+1;
-      c_end=document.cookie.indexOf(";",c_start);
-      if (c_end==-1) c_end=document.cookie.length;
-      return unescape(document.cookie.substring(c_start,c_end));
+  var api = (cityPrecision) ? "ip-city" : "ip-country";
+  var domain = 'api.ipinfodb.com';
+  var url = "http://" + domain + "/v3/" + api + "/?key=bd9419b65f184ca10f4e21610e6642ddecdb784fc049bbdadca887e6208579ed&format=json" + "&callback=" + objectVar + ".setGeoCookie";
+  var geodata;
+  var callbackFunc;
+  var JSON = JSON || {};
+ 
+  // implement JSON.stringify serialization
+  JSON.stringify = JSON.stringify || function (obj) {
+    var t = typeof (obj);
+    if (t != "object" || obj === null) {
+      // simple data type
+      if (t == "string") obj = '"'+obj+'"';
+        return String(obj);
+    } else {
+    // recurse array or object
+      var n, v, json = [], arr = (obj && obj.constructor == Array);
+      for (n in obj) {
+        v = obj[n]; t = typeof(v);
+        if (t == "string") v = '"'+v+'"';
+        else if (t == "object" && v !== null) v = JSON.stringify(v);
+        json.push((arr ? "" : '"' + n + '":') + String(v));
+      }
+      return (arr ? "[" : "{") + String(json) + (arr ? "]" : "}");
+    }
+  };
+ 
+  // implement JSON.parse de-serialization
+  JSON.parse = JSON.parse || function (str) {
+    if (str === "") {
+      str = '""';
+    }
+    eval("var p=" + str + ";");
+    return p;
+  };
+ 
+  //Check if cookie already exist. If not, query IPInfoDB
+  this.checkcookie = function(callback) {
+    geolocationCookie = getCookie('azgeolocation');
+    callbackFunc = callback;
+    if (!geolocationCookie) {
+      getGeolocation();
+    } else {
+      geodata = JSON.parse(geolocationCookie);
+      callbackFunc();
     }
   }
-  return "";
-}
  
-function setCookie(c_name,value,expiredays){
-  var exdate=new Date();
-  exdate.setDate(exdate.getDate()+expiredays);
-  document.cookie=c_name+ "=" +escape(value)+
-  ((expiredays==null) ? "" : ";expires="+exdate.toGMTString());
-}
- 
-function checkCookie(){
-  geolocation=getCookie('geolocation');
-  if (!geolocation){
-    script = document.createElement('script')
-    script.src = "http://ipinfodb.com/ip_query.php?output=json&callback=initialize&timezone=false";
-    document.body.appendChild(script)
+  //API callback function that sets the cookie with the serialized JSON answer
+  this.setGeoCookie = function(answer) {
+    if (answer['statusCode'] == 'OK') {
+      JSONString = JSON.stringify(answer);
+      setCookie('azgeolocation', JSONString, 32);
+      geodata = answer;
+      callbackFunc();
+    }
   }
-  else {
-    document.forms["mapform"].elements["location"].value = geolocation;
-    document.forms["mapform"].elements["iplocationused"].value = "true";
+ 
+  //Return a geolocation field
+  this.getField = function(field) {
+    try {
+      return geodata[field];
+    } catch(err) {}
+  }
+ 
+  //Request to IPInfoDB
+  function getGeolocation() {
+    try {
+      script = document.createElement('script');
+      script.src = url;
+      document.body.appendChild(script);
+    } catch(err) {}
+  }
+ 
+  //Set the cookie
+  function setCookie(c_name, value, expire) {
+    var exdate=new Date();
+    exdate.setDate(exdate.getDate()+expire);
+    document.cookie = c_name+ "=" +escape(value) + ((expire==null) ? "" : ";expires="+exdate.toGMTString());
+  }
+ 
+  //Get the cookie content
+  function getCookie(c_name) {
+    if (document.cookie.length > 0 ) {
+      c_start=document.cookie.indexOf(c_name + "=");
+      if (c_start != -1){
+        c_start=c_start + c_name.length+1;
+        c_end=document.cookie.indexOf(";",c_start);
+        if (c_end == -1) {
+          c_end=document.cookie.length;
+        }
+        return unescape(document.cookie.substring(c_start,c_end));
+      }
+    }
+    return '';
   }
 }
 
+ 
+var visitorGeolocation = null;
 
-function popup(mylink, windowname)
-{
-if (! window.focus)return true;
-var href;
-if (typeof(mylink) == 'string')
-   href=mylink;
-else
-   href=mylink.href;
-window.open(href, windowname, 'width=500,height=300,scrollbars=yes');
-return false;
+var callback = function() {
+  if (visitorGeolocation != null) {
+    latitude=visitorGeolocation.getField('latitude');
+    longitude=visitorGeolocation.getField('longitude');
+    glocation = latitude + ", " + longitude;
+    document.forms["mapform"].elements["location"].value = glocation;
+    document.forms["mapform"].elements["iplocationused"].value = "true";    
+  }
+}
+
+function GetLocClick() {
+  if (visitorGeolocation == null) {
+    visitorGeolocation = new geolocate(false, true, 'visitorGeolocation');
+  }
+  visitorGeolocation.checkcookie(callback);
 }
 //-->
 </script>
+</script>
+<script type="text/javascript" src="http://apis.google.com/js/plusone.js"></script>
 </head>
 <body>
 <h1>Request an Azimuthal Map</h1>
@@ -184,7 +254,7 @@ src="http://pagead2.googlesyndication.com/pagead/show_ads.js">
 </tr>
 <tr>
 <td colspan="4" align="center"><button name="submit" type="submit">Create Map</button>
-<button name="calcloc" type="button"  onClick="checkCookie();" >Estimate Location</button> 
+<button name="calcloc" type="button"  onClick="GetLocClick();" >Estimate Location</button> 
 <input type="hidden" name="iplocationused" value="false" >
 </td></tr>
 <tr><td colspan="4" align="center">Generating maps takes up to 30 seconds.</td></tr>
@@ -228,8 +298,11 @@ constructive feedback, please leave a comment on the <a href="/word/?page_id=10#
     <a href="http://validator.w3.org/check?uri=referer"><img
         src="http://www.w3.org/Icons/valid-html401"
         alt="Valid HTML 4.01 Transitional" height="31" width="88"></a>
-  </p>
-<script type="text/javascript" src="http://hamradionation.com/link_js.php?user=NS6T&link_id=84"></script>
+&nbsp;
+<g:plusone></g:plusone>
+&nbsp;
+<script type="text/javascript" src="http://hamradionation.com/link_js.php?user=NS6T&amp;link_id=84"></script>
+ </p>
 </div>
 </body>
 </html>
