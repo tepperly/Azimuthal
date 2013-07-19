@@ -294,7 +294,7 @@ class AzimuthWriter
     if @radius < EARTHRADIUS*Math::PI
       @pdfwriter.text("Center: " + degree(@latitude, "N", "S") + " " +
                       degree(@longitude, "E", "W") +
-                      sprintf("  Radius: %.0fkm", @radius), 
+                      sprintf("  Radius: %.0f km", @radius), 
                       :font_size => subtitlesize,
                       :justification => :center)
     else
@@ -533,6 +533,46 @@ class AzimuthWriter
         end
       end
     end
+  end
+
+  def markLandmarks(kmlContents)
+    require 'rexml/document'
+    @pdfwriter.save_state
+    @pdfwriter.fill_color!(Color::RGB::Red)
+    @pdfwriter.stroke_color!(Color::RGB::Red)
+    @pdfwriter.select_font("Helvetica")
+    thin = PDF::Writer::StrokeStyle.new(thinline)
+    @pdfwriter.stroke_style(thin)
+    fontsize = min(45.0*@printRadius/@radius,9)
+    doc = REXML::Document.new(kmlContents)
+    doc.elements.each("Placemark") { |place|
+      name = place.elements["name"]
+      if name and name.text
+        name = name.text.force_encoding("iso-8859-1").strip
+      else
+        name = nil
+      end
+      loc = place.elements["Point/coordinates"]
+      if loc and loc.text
+        loc = loc.text.force_encoding("iso-8859-1").strip
+      else
+        loc = nil
+      end
+      if name and loc
+        @pdfwriter.move_to(@center[0], @center[1])
+        latlong = loc.split(",").map { |x| DEGTORAD*x.to_f }
+        ps = toPSCoord($ad.calc(latlong[0], latlong[1], @latitude, @longitude))
+        @pdfwriter.line_to(ps[0], ps[1])
+        @pdfwriter.stroke
+        width = @pdfwriter.text_width(name, fontsize)
+        if ps[1] >= @center[1]
+          @pdfwriter.add_text(ps[0] - 0.5*width, ps[1] + 1, name, fontsize)
+        else
+          @pdfwriter.add_text(ps[0] - 0.5*width, ps[1] - fontsize, name, fontsize)
+        end
+      end
+    }
+    @pdfwriter.restore_state
   end
 
   STDFONTSIZES= [ 0.5,
@@ -1586,6 +1626,9 @@ def handleRequest(cgi)
         File.open("states.azb") { |inf|
           foo.traceLines(inf)
         }
+        if cgi.has_key?("kmlfile")
+          foo.markLandmarks(cgi["kmlfile"])
+        end
         if "on" == cgi["latlong"]
           foo.latlonggrid
         end
