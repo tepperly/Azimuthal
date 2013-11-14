@@ -17,6 +17,7 @@
 # 
 # Parse dates for CGI script queries
 #
+require 'time'
 
 def parseDate(arg)
   if arg and arg.is_a?(String) and not arg.empty?

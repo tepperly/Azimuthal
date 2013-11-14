@@ -295,7 +295,7 @@ class AzimuthWriter
     if @radius < EARTHRADIUS*Math::PI
       @pdfwriter.text("Center: " + degree(@latitude, "N", "S") + " " +
                       degree(@longitude, "E", "W") +
-                      sprintf("  Radius: %.0fkm", @radius), 
+                      sprintf("  Radius: %.0f km", @radius), 
                       :font_size => subtitlesize,
                       :justification => :center)
     else
@@ -542,20 +542,20 @@ class AzimuthWriter
     @pdfwriter.fill_color!(Color::RGB::Red)
     @pdfwriter.stroke_color!(Color::RGB::Red)
     @pdfwriter.select_font("Helvetica")
-    thin = PDF::Writer::StrokeStyle.new(2*thinline)
+    thin = PDF::Writer::StrokeStyle.new(thinline)
     @pdfwriter.stroke_style(thin)
-    fontsize = callsize
+    fontsize = min(45.0*@printRadius/@radius,9)
     doc = REXML::Document.new(kmlContents)
-    doc.elements.each("kml/Placemark") { |place|
+    doc.elements.each("Placemark") { |place|
       name = place.elements["name"]
       if name and name.text
-        name = name.text.strip
+        name = name.text.force_encoding("iso-8859-1").strip
       else
         name = nil
       end
       loc = place.elements["Point/coordinates"]
       if loc and loc.text
-        loc = loc.text.strip
+        loc = loc.text.force_encoding("iso-8859-1").strip
       else
         loc = nil
       end
