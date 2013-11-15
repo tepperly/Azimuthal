@@ -73,15 +73,23 @@ KNOWNPAPER = {
 }
 
 def filter(data, totalcount)
-  cutoff = totalcount / 200
-  result = { 'Other' => 0 }
-  data.each { |k,v|
-    if (v >= cutoff) 
-      result[k] = v
-    else
-      result['Other'] = result['Other'] + v
-    end
-  }
+  if data.size > 12
+    tmp = Array.new
+    data.each { |k,v|
+      tmp.push([k, v])
+    }
+    tmp.sort! {|x,y| y[1] <=> x[1] }
+    result = Hash.new
+    11.times { |i|
+      result[tmp[i][0]] = tmp[i][1]
+    }
+    result["Other"] = 0
+    11.upto(tmp.size-1) { |i|
+      result["Other"] = result["Other"] + tmp[i][1]
+    }
+  else
+    result = data
+  end
   result
 end
 

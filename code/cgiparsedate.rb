@@ -31,6 +31,8 @@ def parseDate(arg)
       return now - 7*24*60*60
     elsif str == "NOW"
       return now
+    elsif str == "LAST MONTH"
+      return now - 30*24*60*60
     else
       begin
         return Time.parse(arg)

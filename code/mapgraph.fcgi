@@ -13,14 +13,18 @@ require 'cgiparsedate'
 def handleRequest(cgi)
   startingTime = parseDate(cgi["since"])
   datelimit = ""
+  xAxisFormat = "%m-%Y"
   if startingTime
     datelimit = " and datetime >= " + startingTime.to_i.to_s
+    if (startingTime - Time.now) < 30*7*24*60*60
+      xAxisFormat = "%m-%d-%Y"
+    end
   end
   graph = SVG::Graph::TimeSeries.new( { :graph_title => "Azimuthal Maps Generated",
                                         :show_graph_title => true,
                                         :title_font_size => 24,
                                         :show_data_values => false,
-                                        :x_label_format => "%m-%Y",
+                                        :x_label_format => xAxisFormat,
                                         :width => 850,
                                         :height => 480
 } )
