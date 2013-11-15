@@ -17,8 +17,8 @@
 # You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-ACODE = 'A'[0]
-ZEROCODE = '0'[0]
+ACODE = 'A'.ord
+ZEROCODE = '0'.ord
 SUBLONG = 2.0/24.0
 SUBLAT = 1.0/24.0
 EXTENDEDLONG = SUBLONG / 10.0
@@ -29,20 +29,20 @@ def maidenheadToLatLong(text)
 
   if text.length == 4 or text.length == 6 or text.length == 8
     text = text.upcase
-    longitude = -180 + 20*(text[0]- ACODE) + 2*(text[2]- ZEROCODE)
-    latitude = -90 + 10*(text[1] - ACODE) + 1*(text[3]- ZEROCODE)
+    longitude = -180 + 20*(text[0].ord - ACODE) + 2*(text[2].ord - ZEROCODE)
+    latitude = -90 + 10*(text[1].ord - ACODE) + 1*(text[3].ord - ZEROCODE)
     if text.length == 4
       longitude = longitude + 1
       latitude = latitude + 0.5
     else
-      longitude = longitude + SUBLONG*(text[4] - ACODE)
-      latitude = latitude + SUBLAT*(text[5] - ACODE)
+      longitude = longitude + SUBLONG*(text[4].ord - ACODE)
+      latitude = latitude + SUBLAT*(text[5].ord - ACODE)
       if text.length == 6
         longitude = longitude + 0.5 * SUBLONG
         latitude = latitude + 0.5 * SUBLAT
       else
-        longitude = longitude + EXTENDEDLONG*((text[6] - ZEROCODE) + 0.5)
-        latitude = latitude + EXTENDEDLAT*((text[7] - ZEROCODE) + 0.5)
+        longitude = longitude + EXTENDEDLONG*((text[6].ord - ZEROCODE) + 0.5)
+        latitude = latitude + EXTENDEDLAT*((text[7].ord - ZEROCODE) + 0.5)
       end
     end
   else

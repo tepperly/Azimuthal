@@ -1,4 +1,5 @@
 #!/usr/bin/env ruby
+# -*- coding: utf-8 -*-
 # $Id: azimuth.fcgi 162 2011-02-21 17:12:08Z tepperly $
 #
 # This file is part of the Azimuthal Map Creator.
@@ -22,8 +23,9 @@ require 'rubygems'
 require 'sqlite3'
 require 'tempfile'
 
-require 'pdf/writer'
-require 'color/rgb'
+require 'prawn'
+require 'prawn/measurement_extensions'
+
 require 'fcgi'
 require 'anglecalc'
 require 'mapcalcs'
@@ -32,6 +34,15 @@ require 'grid'
 
 $ad = AngleDist.new
 # require 'basicops'
+
+BLACK = "000000"
+WHITE = "FFFFFF"
+GRAY80 = "CCCCCC"
+SKYBLUE = "87CEEB"
+RED = "FF0000"
+GRAY40 = "666666"
+GRAY60 = "999999"
+GRAY50 = "808080"
 
 TOLERANCE = 0.001
 EARTHRADIUS=6371.01           # average value
@@ -249,7 +260,7 @@ def degree(rad, pos, neg)
   min = (deg - degi)*60.0
   mini = min.truncate
   sec = ((min - mini)*60.0).truncate
-  degi.to_s + "\260" + mini.to_s + "'" + sec.to_s + "\"" + tag
+  degi.to_s + "°" + mini.to_s + "'" + sec.to_s + "\"" + tag
 end
   
 
@@ -263,70 +274,67 @@ class AzimuthWriter
                  blueBackground=true,
                  title="Azimuthal Projection",
                  bwonly = nil)
-    @pdfwriter = PDF::Writer.new(:paper => paper)
-    @pdfwriter.compressed = true
+
     @latitude = latitude
     @longitude = longitude
+    @pdfwriter = Prawn::Document.new(:page_size => paper, :compressed => true, 
+                                     :page_layout => :portrait,
+                                     :info => setdocumentprops)
     @bwonly = bwonly
-    width = min(@pdfwriter.margin_width, 0.85*@pdfwriter.page_width)
-    height = min(@pdfwriter.margin_height, 0.85*@pdfwriter.page_height)
+    width = @pdfwriter.margin_box.width
+
+    height = @pdfwriter.margin_box.height
     @printRadius = 0.5*min(width, height) - 5
-    @center = [ @pdfwriter.margin_x_middle,
-                    ycenter ]
+    @center = [ 0.5*width, 0.5*height ]
     @radius = radius
     if blueBackground
       if @bwonly
-        @pdfwriter.fill_color!(Color::RGB::Gray80)
+        @pdfwriter.fill_color(GRAY80) # 80% Gray Color::RGB::Gray80
       else
-        @pdfwriter.fill_color!(Color::RGB::SkyBlue)
+        @pdfwriter.fill_color(SKYBLUE) # Color::RGB::SkyBlue
       end
-      @pdfwriter.circle_at(@center[0], @center[1], @printRadius).
-        fill
+      @pdfwriter.fill_circle([@center[0], @center[1]], @printRadius)
     end
     @title = title
     setdocumentprops
   end
 
   def heading
-    @pdfwriter.fill_color!(Color::RGB::Black)
-    @pdfwriter.select_font("Times-Roman")
-    @pdfwriter.text(@title, :font_size => titlefontsize, 
-                    :justification => :center)
+    @pdfwriter.fill_color(BLACK)
+    @pdfwriter.font("Times-Roman")
+    @pdfwriter.text(@title, :size => titlefontsize, 
+                    :align => :center)
     if @radius < EARTHRADIUS*Math::PI
       @pdfwriter.text("Center: " + degree(@latitude, "N", "S") + " " +
                       degree(@longitude, "E", "W") +
                       sprintf("  Radius: %.0f km", @radius), 
-                      :font_size => subtitlesize,
-                      :justification => :center)
+                      :size => subtitlesize,
+                      :align => :center)
     else
       @pdfwriter.text("Center: " + degree(@latitude, "N", "S") + " " +
                       degree(@longitude, "E", "W"), 
-                      :font_size => subtitlesize,
-                      :justification => :center)
+                      :size => subtitlesize,
+                      :align => :center)
     end
     @pdfwriter.text("Courtesy of Tom (NS6T)",
-                    :font_size => complimentssize, 
-                    :justification => :center)
+                    :size => complimentssize,
+                    :align => :center)
   end
 
   def footer
-    @pdfwriter.add_text_wrap(0, 18, @pdfwriter.page_width,
-                             "Map from <c:alink uri=\"http://ns6t.net/\">http://ns6t.net/</c:alink>",
-                             size=10,justification=:center)
+    @pdfwriter.text_box("Map from <link href=\"http://ns6t.net/\">http://ns6t.net/<link>",
+                        :at => [0, 18], :width => @pdfwriter.margin_box.width,
+                        :align => :center, :size=> 10, :inline_format => true)
   end
 
   def setdocumentprops
-    @pdfwriter.info.title = @title
-    @pdfwriter.info.author = "ns6t@arrl.net"
-    @pdfwriter.info.subject = "Azimuthal map centered at " +
-      degree(@latitude, "N", "S") + " " +
-      degree(@longitude, "E", "W")
-    @pdfwriter.info.keywords = "azimuthal map ham amateur radio NS6T"
-    @pdfwriter.info.producer = 'azimuth.fcgi $Revision: 162 $ using PDF::Writer for Ruby'
-  end
-
-  def ycenter 
-    return @pdfwriter.margin_y_middle
+    { :Title => @title,
+      :Author => "ns6t@arrl.net",
+      :Subject => ("Azimuthal map centered at " + degree(@latitude, "N", "S") + " " +
+                    degree(@longitude, "E", "W")),
+      :Keywords => "azimuthal map ham amateur radio NS6T",
+      :Producer => 'azimuth.fcgi $Revision: 162 $ using Prawn for Ruby'
+    }
   end
 
   def outOfBounds?(point)
@@ -357,11 +365,8 @@ class AzimuthWriter
        p1 = toPSCoord([@radius, theta])
        c1 = @printRadius*Math::cos(theta)
        d1 = -@printRadius*Math::sin(theta)
-       @pdfwriter.curve_to(p0[0] + (c0 * dtm),
-                           p0[1] + (d0 * dtm),
-                           p1[0] - (c1 * dtm),
-                           p1[1] - (d1 * dtm),
-                           p1[0], p1[1])
+       @pdfwriter.curve_to([p1[0], p1[1]], :bounds => [[p0[0] + (c0 * dtm), p0[1] + (d0 * dtm)],
+                             [p1[0] - (c1 * dtm), p1[1] - (d1 * dtm)]])
        p0 = p1
        c0 = c1
        d0 = d1
@@ -464,12 +469,12 @@ class AzimuthWriter
       maxradius = min(maxradius, EARTHRADIUS*Math::PI)
       if "Lake" == pathData[1]
         if @bwonly
-          @pdfwriter.fill_color!(Color::RGB::Gray80)
+          @pdfwriter.fill_color(GRAY80)
         else
-          @pdfwriter.fill_color!(Color::RGB::SkyBlue)
+          @pdfwriter.fill_color(SKYBLUE)
         end
       else
-        @pdfwriter.fill_color!(Color::RGB::White)
+        @pdfwriter.fill_color(WHITE)
       end
       otherSide = includesOpposite(points, pathData)
       if not otherSide or points.length > 120
@@ -509,7 +514,8 @@ class AzimuthWriter
           end
         end
         if not otherSide or path.empty?
-          @pdfwriter.close_fill_stroke(:even_odd)
+          @pdfwriter.close_path
+          @pdfwriter.fill_and_stroke(:fill_rule => :even_odd)
         end
         lastFeas = nil
         prevPt = nil
@@ -530,7 +536,8 @@ class AzimuthWriter
               lastFeas = currPt
             end
           }
-          @pdfwriter.close_fill_stroke
+          @pdfwriter.close_path
+          @pdfwriter.fill_and_stroke
         end
       end
     end
@@ -538,48 +545,47 @@ class AzimuthWriter
 
   def markLandmarks(kmlContents)
     require 'rexml/document'
-    @pdfwriter.save_state
-    @pdfwriter.fill_color!(Color::RGB::Red)
-    @pdfwriter.stroke_color!(Color::RGB::Red)
-    @pdfwriter.select_font("Helvetica")
-    thin = PDF::Writer::StrokeStyle.new(thinline)
-    @pdfwriter.stroke_style(thin)
-    fontsize = min(45.0*@printRadius/@radius,9)
-    doc = REXML::Document.new(kmlContents)
-    doc.elements.each("Placemark") { |place|
-      name = place.elements["name"]
-      if name and name.text
-        name = name.text.force_encoding("iso-8859-1").strip
-      else
-        name = nil
-      end
-      loc = place.elements["Point/coordinates"]
-      if loc and loc.text
-        loc = loc.text.force_encoding("iso-8859-1").strip
-      else
-        loc = nil
-      end
-      if name and loc
-        @pdfwriter.move_to(@center[0], @center[1])
-        latlong = loc.split(",").map { |x| DEGTORAD*x.to_f }
-        polar = $ad.calc(latlong[0], latlong[1], @latitude, @longitude)
-        if polar[0] <= @radius
-          ps = toPSCoord(polar)
-          @pdfwriter.line_to(ps[0], ps[1])
-          @pdfwriter.stroke
-          width = @pdfwriter.text_width(name, fontsize)
-          if ps[1] >= @center[1]
-            @pdfwriter.add_text(ps[0] - 0.5*width, ps[1] + 1, name, fontsize)
-          else
-            @pdfwriter.add_text(ps[0] - 0.5*width, ps[1] - fontsize, name, fontsize)
+    @pdfwriter.save_graphics_state do
+      @pdfwriter.fill_color(RED) #Color::RGB::Red
+      @pdfwriter.stroke_color(RED)
+      @pdfwriter.font("Helvetica")
+      @pdfwriter.line_width = thinline
+      fontsize = min(45.0*@printRadius/@radius,9)
+      doc = REXML::Document.new(kmlContents)
+      doc.elements.each("Placemark") { |place|
+        name = place.elements["name"]
+        if name and name.text
+          name = name.text.force_encoding("iso-8859-1").strip
+        else
+          name = nil
+        end
+        loc = place.elements["Point/coordinates"]
+        if loc and loc.text
+          loc = loc.text.force_encoding("iso-8859-1").strip
+        else
+          loc = nil
+        end
+        if name and loc
+          @pdfwriter.move_to(@center[0], @center[1])
+          latlong = loc.split(",").map { |x| DEGTORAD*x.to_f }
+          polar = $ad.calc(latlong[0], latlong[1], @latitude, @longitude)
+          if polar[0] <= @radius
+            ps = toPSCoord(polar)
+            @pdfwriter.line_to(ps[0], ps[1])
+            @pdfwriter.stroke
+            width = @pdfwriter.width_of(name, :size => fontsize)
+            if ps[1] >= @center[1]
+              @pdfwriter.draw_text(name, :at => [ps[0] - 0.5*width, ps[1] + 1], :size => fontsize)
+            else
+              @pdfwriter.draw_text(name, :at => [ps[0] - 0.5*width, ps[1] - fontsize], :size => fontsize)
+            end
           end
         end
-      end
-    }
-    @pdfwriter.restore_state
+      }
+    end
   end
 
-  STDFONTSIZES= [ 0.5,
+  STDFONTSIZES = [ 0.5,
                   1, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 72,
                   96, 144 ]
   def labelsize
@@ -828,60 +834,58 @@ class AzimuthWriter
   end
 
   def gridsquarelabels
-    @pdfwriter.save_state
-    style = PDF::Writer::StrokeStyle.new(thinnestline)
-    @pdfwriter.stroke_style(style)
-    if @bwonly
-      @pdfwriter.stroke_color!(Color::RGB::Gray40)
-      @pdfwriter.fill_color!(Color::RGB::Gray40)
-    else
-      @pdfwriter.stroke_color!(Color::RGB::Red)
-      @pdfwriter.fill_color!(Color::RGB::Red)
-    end
-    @pdfwriter.text_render_style!(1)
-    stdsize = 600.0*(@printRadius / max(@radius,10))
-    'A'.upto('R') { |lat|
-      size = case lat
+    @pdfwriter.save_graphics_state do
+      @pdfwriter.line_width = thinnestline
+      if @bwonly
+        @pdfwriter.stroke_color(GRAY40)
+        @pdfwriter.fill_color(GRAY40)
+      else
+        @pdfwriter.stroke_color(RED)
+        @pdfwriter.fill_color(RED)
+      end
+      @pdfwriter.text_render_style!(1)
+      stdsize = 600.0*(@printRadius / max(@radius,10))
+      'A'.upto('R') { |lat|
+        size = case lat
                when 'A' then 0.25*stdsize
                when 'B' then 0.5*stdsize
                when 'Q' then 0.5*stdsize
                when 'R' then 0.25*stdsize
                else stdsize
-             end
-      yadjust = -0.5*@pdfwriter.font_height(size)
-      'A'.upto('R') { |long|
-        coord = maidenheadToLatLong(long + lat + "55")
-        polar = $ad.calc(coord[0]*DEGTORAD, coord[1]*DEGTORAD,
-                                 @latitude, @longitude)
-        if polar[0] <= @radius
-          psc = toPSCoord(polar)
-          text = long+lat
-          xadjust = -0.5*@pdfwriter.text_width(text, size)
-          @pdfwriter.add_text(psc[0]+xadjust, psc[1]+yadjust, text, size)
-        end
+               end
+        yadjust = -0.5*@pdfwriter.font_height(size)
+        'A'.upto('R') { |long|
+          coord = maidenheadToLatLong(long + lat + "55")
+          polar = $ad.calc(coord[0]*DEGTORAD, coord[1]*DEGTORAD,
+                           @latitude, @longitude)
+          if polar[0] <= @radius
+            psc = toPSCoord(polar)
+            text = long+lat
+            xadjust = -0.5*@pdfwriter.width_of(text, :size => size)
+            @pdfwriter.draw_text(text, :at => [psc[0]+xadjust, psc[1]+yadjust], :size => size)
+          end
+        }
       }
-    }
-    @pdfwriter.restore_state
+    end
   end
 
   def latlonggrid
-    @pdfwriter.save_state
-    style = PDF::Writer::StrokeStyle.new(thinnestline)
-    @pdfwriter.stroke_style(style)
-    if @bwonly
-      @pdfwriter.stroke_color!(Color::RGB::Gray60)
-      @pdfwriter.fill_color!(Color::RGB::Gray60)
-    else
-      @pdfwriter.stroke_color!(Color::RGB::Red)
-      @pdfwriter.fill_color!(Color::RGB::Red)
+    @pdfwriter.save_graphics_state do
+      @pdfwriter.line_width = thinnestline
+      if @bwonly
+        @pdfwriter.stroke_color(GRAY60)
+        @pdfwriter.fill_color(GRAY60)
+      else
+        @pdfwriter.stroke_color(RED)
+        @pdfwriter.fill_color(RED)
+      end
+      17.times { |i|
+        drawLatitudeLine(-80 + i*10)
+      }
+      18.times { |i|
+        drawLongitudeLine(i*20)
+      }
     end
-    17.times { |i|
-      drawLatitudeLine(-80 + i*10)
-    }
-    18.times { |i|
-      drawLongitudeLine(i*20)
-    }
-    @pdfwriter.restore_state
   end
 
   def clearOutsideMap
@@ -889,80 +893,78 @@ class AzimuthWriter
       line_to(@pdfwriter.page_width, @pdfwriter.page_height).
       line_to(@pdfwriter.page_width,0).close
     @pdfwriter.circle_at(@center[0], @center[1], @printRadius)
-    @pdfwriter.fill_color!(Color::RGB::White)
+    @pdfwriter.fill_color(WHITE)
     @pdfwriter.fill(:even_odd)
   end
 
 
   def frame
-    @pdfwriter.save_state
-    style = PDF::Writer::StrokeStyle.new(2*thickline)
-    @pdfwriter.stroke_style(style)
-    @pdfwriter.fill_color!(Color::RGB::Black)
-      @pdfwriter.translate_axis(@center[0], @center[1])
-    outer =  @printRadius+extraspace
-    thin = PDF::Writer::StrokeStyle.new(thinline)
-    @pdfwriter.stroke_style(thin)
-    360.times { |i|
-      r = i*DEGTORAD
-      s = Math::sin(r)
-      c = Math::cos(r)
-      if ((i % 10) == 0)
-        numstr = ((90 - i) % 360).to_s 
-        label = numstr + "\260"
-        w = 0.5*@pdfwriter.text_width(numstr, labelsize)
-        if i <= 180
-          tangle =  (i-90)%360
-          x = (outer+0.7*thickline) * c - w*Math::cos(tangle*DEGTORAD)
-          y = (outer+0.7*thickline) * s - w*Math::sin(tangle*DEGTORAD)
-          @pdfwriter.add_text(x,y,label,labelsize,angle=tangle)
-        else
-          tangle =  (90+i)%360
-          x = (outer+0.7*thickline + 0.8*labelsize) * c - 
-            w*Math::cos(tangle*DEGTORAD)
-          y = (outer+0.7*thickline + 0.8*labelsize) * s -
-            w*Math::sin(tangle*DEGTORAD)
-          @pdfwriter.add_text(x,y,label,labelsize,angle=tangle)
-        end
-        @pdfwriter.stroke_style(style)
-      end
-      @pdfwriter.move_to(@printRadius*c, @printRadius*s)
-      @pdfwriter.line_to(outer*c, outer*s).stroke
-      if ((i % 10) == 0)
-        @pdfwriter.stroke_style(thin)
-      end
-    }
-    @pdfwriter.stroke_style(thin)
-    @pdfwriter.stroke_color!(Color::RGB::Gray50)
-    @pdfwriter.circle_at(0, 0, 0.25*@printRadius).close_stroke
-    @pdfwriter.circle_at(0, 0, 0.5*@printRadius).close_stroke
-    @pdfwriter.circle_at(0, 0, 0.75*@printRadius).close_stroke
-    72.times { |i|
-      r = i*5*DEGTORAD
-      s = Math::sin(r)
-      c = Math::cos(r)
-      if (i % 6) == 0
-        @pdfwriter.move_to(0,0)
-      elsif (i % 2) == 0
-        @pdfwriter.move_to(0.25*@printRadius*c, 0.25*@printRadius*s)
-      else
-        @pdfwriter.move_to(0.5*@printRadius*c, 0.5*@printRadius*s)
-      end
-      @pdfwriter.line_to(@printRadius*c,@printRadius*s).close_stroke
-    }
-    @pdfwriter.stroke_color!(Color::RGB::Black)
-    @pdfwriter.circle_at(0, 0, @printRadius).close_stroke
-    @pdfwriter.circle_at(0, 0, @printRadius+extraspace).close_stroke
-      
-    @pdfwriter.restore_state
+    @pdfwriter.save_graphics_state do
+      @pdfwriter.line_width = 2*thickline
+      @pdfwriter.fill_color(BLACK)
+      @pdfwriter.translate(@center[0], @center[1]) {
+        outer =  @printRadius+extraspace
+        @pdfwriter.line_width = thinline
+        360.times { |i|
+          r = i*DEGTORAD
+          s = Math::sin(r)
+          c = Math::cos(r)
+          if ((i % 10) == 0)
+            numstr = ((90 - i) % 360).to_s 
+            label = numstr + "°"
+            w = 0.5*@pdfwriter.width_of(numstr, :size => labelsize)
+            if i <= 180
+              tangle =  (i-90)%360
+              x = (outer+0.7*thickline) * c - w*Math::cos(tangle*DEGTORAD)
+              y = (outer+0.7*thickline) * s - w*Math::sin(tangle*DEGTORAD)
+              @pdfwriter.draw_text(label.encode("utf-8"), :at => [x,y], :size => labelsize,:rotate => tangle)
+            else
+              tangle =  (90+i)%360
+              x = (outer+0.7*thickline + 0.8*labelsize) * c - 
+                w*Math::cos(tangle*DEGTORAD)
+              y = (outer+0.7*thickline + 0.8*labelsize) * s -
+                w*Math::sin(tangle*DEGTORAD)
+              @pdfwriter.draw_text(label, :at => [x,y], :size => labelsize,:rotate => tangle)
+            end
+            @pdfwriter.line_width = 2*thickline
+          end
+          @pdfwriter.stroke_line([@printRadius*c, @printRadius*s], 
+                                 [outer*c, outer*s])
+          if ((i % 10) == 0)
+            @pdfwriter.line_width = thinline
+          end
+        }
+        @pdfwriter.line_width = thinline
+        @pdfwriter.stroke_color(GRAY50)
+        @pdfwriter.stroke_circle([0, 0], 0.25*@printRadius)
+        @pdfwriter.stroke_circle([0, 0], 0.5*@printRadius)
+        @pdfwriter.stroke_circle([0, 0], 0.75*@printRadius)
+        72.times { |i|
+          r = i*5*DEGTORAD
+          s = Math::sin(r)
+          c = Math::cos(r)
+          if (i % 6) == 0
+            @pdfwriter.move_to(0,0)
+          elsif (i % 2) == 0
+            @pdfwriter.stroke_line([0.25*@printRadius*c, 0.25*@printRadius*s],
+                                   [@printRadius*c,@printRadius*s])
+          else
+            @pdfwriter.stroke_line([0.5*@printRadius*c, 0.5*@printRadius*s],
+                                   [@printRadius*c,@printRadius*s])
+          end
+        }
+        @pdfwriter.stroke_color(BLACK)
+        @pdfwriter.stroke_circle([0, 0], @printRadius)
+        @pdfwriter.stroke_circle([0, 0], @printRadius+extraspace)
+      }
+    end
   end
-    
+
 
   def traceFile(inf)
-    @pdfwriter.fill_color!(Color::RGB::White)
-    style = PDF::Writer::StrokeStyle.new(thinline)
-    style.join = :round
-    @pdfwriter.stroke_style(style)
+    @pdfwriter.fill_color(WHITE)
+    @pdfwriter.line_width = thinline
+    @pdfwriter.cap_style = :round
     parseAndTrace(inf)
   end
 
@@ -1242,17 +1244,17 @@ class AzimuthWriter
              ]
 
   def labelCountries
-    @pdfwriter.fill_color!(Color::RGB::Gray)
-    @pdfwriter.select_font("Helvetica")
+    @pdfwriter.fill_color(GRAY50) # Color::RGB::Gray
+    @pdfwriter.font("Helvetica")
     fontsize  =80.0*@printRadius/@radius
     (COUNTRIES).each { |state|
       polar = $ad.calc(state[1]*DEGTORAD, state[2]*DEGTORAD,
                        @latitude, @longitude)
       if polar[0] < @radius
         ps = toPSCoord(polar)
-        @pdfwriter.add_text(ps[0]-0.5*@pdfwriter.text_width(state[0], 
-                                                            fontsize*state[3]),
-                            ps[1], state[0],fontsize*state[3])
+        @pdfwriter.draw_text(state[0],
+                             :at => [ps[0]-0.5*@pdfwriter.width_of(state[0], :size => fontsize*state[3]),
+                               ps[1]], :size => fontsize*state[3])
       end
     }
     clearOutsideMap
@@ -1281,7 +1283,7 @@ class AzimuthWriter
                            @latitude, @longitude)
           if polar[0] < @radius
             ps = toPSCoord(polar)
-            textRadius = 0.55*@pdfwriter.text_width(stateInfo[0], fontsize)
+            textRadius = 0.55*@pdfwriter.width_of(stateInfo[0], :size => fontsize)
             bb = [[ps[0] - 0.83333333*textRadius - extra_space,
                    ps[1] - dotsize - extra_space],
                   [ps[0] + 0.83333333*textRadius + extra_space,
@@ -1289,9 +1291,8 @@ class AzimuthWriter
             if isClear(obscured, ps[0], ps[1], bb)
               obscured.push([ps[0], ps[1], bb])
               @pdfwriter.circle_at(ps[0], ps[1], dotsize).fill
-              @pdfwriter.add_text(ps[0] - 0.8333333*textRadius, 
-                                  ps[1] + 1.25*dotsize,
-                                  stateInfo[0], fontsize)
+              @pdfwriter.draw_text(stateInfo[0], :at => [ps[0] - 0.8333333*textRadius, 
+                                     ps[1] + 1.25*dotsize], :size => fontsize)
             end
           end
         end
@@ -1313,42 +1314,41 @@ class AzimuthWriter
   end
 
   def labelPrefixes
-    @pdfwriter.save_state
-    @pdfwriter.fill_color!(Color::RGB::Black)
-    style = PDF::Writer::StrokeStyle.new(0.5*thinnestline)
-    @pdfwriter.stroke_style(style)
-    @pdfwriter.stroke_color!(Color::RGB::White)
-    @pdfwriter.select_font("Helvetica")
-    @pdfwriter.text_render_style(2) # fill and then stroke
-    File.open("cty.dat") { |inf|
-      while (line = inf.gets)
-        latitude = line[39,8].strip.to_f
-        longitude = -(line[48,8].strip.to_f)
-        prefix = line[69..-1].strip.chop
-        if prefix[0] == "*"
-          prefix = prefix[1..-1]
-        end
-        polar = $ad.calc(latitude*DEGTORAD, longitude*DEGTORAD, @latitude, @longitude)
-        if polar[0] <= @radius
-          psc = toPSCoord(polar)
-          xadjust = -0.5*@pdfwriter.text_width(prefix, prefixsize)
-          @pdfwriter.add_text(psc[0]+xadjust, psc[1], prefix, prefixsize)
-        end
-
+    @pdfwriter.save_graphics_state do
+      @pdfwriter.fill_color(BLACK)
+      @pdfwriter.line_width = 0.5*thinnestline
+      @pdfwriter.stroke_color(WHITE)
+      @pdfwriter.font("Helvetica")
+      @pdfwriter.text_render_style(2) # fill and then stroke
+      File.open("cty.dat") { |inf|
         while (line = inf.gets)
-          if line =~ /;\s*$/
-            break
+          latitude = line[39,8].strip.to_f
+          longitude = -(line[48,8].strip.to_f)
+          prefix = line[69..-1].strip.chop
+          if prefix[0] == "*"
+            prefix = prefix[1..-1]
+          end
+          polar = $ad.calc(latitude*DEGTORAD, longitude*DEGTORAD, @latitude, @longitude)
+          if polar[0] <= @radius
+            psc = toPSCoord(polar)
+            xadjust = -0.5*@pdfwriter.width_of(prefix, :size => prefixsize)
+            @pdfwriter.draw_text(prefix, :at => [psc[0]+xadjust, psc[1]], :size => prefixsize)
+          end
+
+          while (line = inf.gets)
+            if line =~ /;\s*$/
+              break
+            end
           end
         end
-      end
-    }
-    @pdfwriter.restore_state
+      }
+    end
   end
 
   def labelCities
     extra_space = 1
-    @pdfwriter.fill_color!(Color::RGB::Black)
-    @pdfwriter.select_font("Helvetica")
+    @pdfwriter.fill_color(BLACK)
+    @pdfwriter.font("Helvetica")
     fontsize = min(45.0*@printRadius/@radius,9)
     dotsize = min(4.0*@printRadius/@radius,1.5)
     obscured = [ ]
@@ -1363,16 +1363,17 @@ class AzimuthWriter
   end
 
   def labelStates
-    @pdfwriter.fill_color!(Color::RGB::Black)
-    @pdfwriter.select_font("Helvetica")
+    @pdfwriter.fill_color(BLACK)
+    @pdfwriter.font("Helvetica")
     fontsize  =80.0*@printRadius/@radius
     (USSTATES+CASTATES).each { |state|
       polar = $ad.calc(state[1]*DEGTORAD, state[2]*DEGTORAD,
                        @latitude, @longitude)
       if polar[0] < @radius
         ps = toPSCoord(polar)
-        @pdfwriter.add_text(ps[0]-0.5*@pdfwriter.text_width(state[0], fontsize),
-                            ps[1], state[0],fontsize)
+        @pdfwriter.draw_text(state[0],
+                             :at => [ps[0]-0.5*@pdfwriter.width_of(state[0], :size => fontsize),
+                               ps[1]], :size => fontsize)
       end
     }
     clearOutsideMap
@@ -1489,11 +1490,11 @@ KNOWNPAPER = {
   "SRA3" => "SRA3",
   "SRA4" => "SRA4",
   "ANSI A" => "LETTER",
-  "ANSI B" => [0, 0, PDF::Writer.in2pts(11), PDF::Writer.in2pts(17) ],
-  "TABLOID" => [0, 0, PDF::Writer.in2pts(11), PDF::Writer.in2pts(17) ],
-  "ANSI C" => [0, 0, PDF::Writer.in2pts(17), PDF::Writer.in2pts(22) ],
-  "ANSI D" => [0, 0, PDF::Writer.in2pts(22), PDF::Writer.in2pts(34) ],
-  "ANSI E" => [0, 0, PDF::Writer.in2pts(34), PDF::Writer.in2pts(44) ]
+  "ANSI B" => [0, 0, 11.in, 17.in ],
+  "TABLOID" => [0, 0, 11.in, 17.in ],
+  "ANSI C" => [0, 0, 17.in, 22.in ],
+  "ANSI D" => [0, 0, 22.in, 34.in ],
+  "ANSI E" => [0, 0, 34.in, 44.in ]
 }
 
 def bool(v)
