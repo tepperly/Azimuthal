@@ -277,7 +277,7 @@ class AzimuthWriter
 
     @latitude = latitude
     @longitude = longitude
-    @pdfwriter = Prawn::Document.new(:page_size => paper, :compressed => true, 
+    @pdfwriter = Prawn::Document.new(:page_size => paper, :compressed => true, :optimized => true,
                                      :page_layout => :portrait,
                                      :info => setdocumentprops)
     @bwonly = bwonly
@@ -333,6 +333,8 @@ class AzimuthWriter
       :Subject => ("Azimuthal map centered at " + degree(@latitude, "N", "S") + " " +
                     degree(@longitude, "E", "W")),
       :Keywords => "azimuthal map ham amateur radio NS6T",
+      :CreationDate => Time.now,
+      :ModDate => Time.now,
       :Producer => 'azimuth.fcgi $Revision: 162 $ using Prawn for Ruby'
     }
   end
@@ -479,7 +481,7 @@ class AzimuthWriter
       otherSide = includesOpposite(points, pathData)
       if not otherSide or points.length > 120
         if otherSide and @radius >= maxradius
-          @pdfwriter.circle_at(@center[0], @center[1], @printRadius)
+          @pdfwriter.circle([@center[0], @center[1]], @printRadius)
         end
         path = [ ]
         firstFeas = nil
@@ -777,8 +779,7 @@ class AzimuthWriter
     if pts.length > 2
       s = Spline.new(pts, type)
       s.each { |p0, p1, p2, p3|
-        @pdfwriter.curve(p0[0], p0[1], p1[0], p1[1], 
-                         p2[0], p2[1], p3[0], p3[1]).stroke
+        @pdfwriter.stroke_curve([p0[0], p0[1]], [p3[0], p3[1]], :bounds => [[ p1[0], p1[1]], [p2[0], p2[1]]])
       }
     end
   end
@@ -843,7 +844,6 @@ class AzimuthWriter
         @pdfwriter.stroke_color(RED)
         @pdfwriter.fill_color(RED)
       end
-      @pdfwriter.text_render_style!(1)
       stdsize = 600.0*(@printRadius / max(@radius,10))
       'A'.upto('R') { |lat|
         size = case lat
@@ -853,7 +853,7 @@ class AzimuthWriter
                when 'R' then 0.25*stdsize
                else stdsize
                end
-        yadjust = -0.5*@pdfwriter.font_height(size)
+        yadjust = -0.5*@pdfwriter.font.height_at(size)
         'A'.upto('R') { |long|
           coord = maidenheadToLatLong(long + lat + "55")
           polar = $ad.calc(coord[0]*DEGTORAD, coord[1]*DEGTORAD,
@@ -862,7 +862,9 @@ class AzimuthWriter
             psc = toPSCoord(polar)
             text = long+lat
             xadjust = -0.5*@pdfwriter.width_of(text, :size => size)
-            @pdfwriter.draw_text(text, :at => [psc[0]+xadjust, psc[1]+yadjust], :size => size)
+            @pdfwriter.text_rendering_mode(:stroke) {
+              @pdfwriter.draw_text(text, :at => [psc[0]+xadjust, psc[1]+yadjust], :size => size)
+            }
           end
         }
       }
@@ -889,12 +891,14 @@ class AzimuthWriter
   end
 
   def clearOutsideMap
-    @pdfwriter.move_to(0,0).line_to(0,@pdfwriter.page_height).
-      line_to(@pdfwriter.page_width, @pdfwriter.page_height).
-      line_to(@pdfwriter.page_width,0).close
-    @pdfwriter.circle_at(@center[0], @center[1], @printRadius)
+    @pdfwriter.move_to(0,0)
+    @pdfwriter.line_to(0,@pdfwriter.margin_box.height)
+    @pdfwriter.line_to(@pdfwriter.margin_box.width, @pdfwriter.margin_box.height)
+    @pdfwriter.line_to(@pdfwriter.margin_box.width,0)
+    @pdfwriter.close_path
+    @pdfwriter.circle([@center[0], @center[1]], @printRadius)
     @pdfwriter.fill_color(WHITE)
-    @pdfwriter.fill(:even_odd)
+    @pdfwriter.fill(:fill_rule => :even_odd)
   end
 
 
@@ -1275,6 +1279,7 @@ class AzimuthWriter
   def labelSites(inf, fontsize, dotsize, extra_space, obscured, cutoff)
     comment = /^\s*\#/
     while (line = inf.gets)
+      line = line.encode("utf-8")
       if (not comment.match(line))
         stateInfo = line.split("|")
         if (stateInfo[2].to_i >= cutoff)
@@ -1290,7 +1295,7 @@ class AzimuthWriter
                    ps[1] + 1.25*dotsize + fontsize + extra_space]]
             if isClear(obscured, ps[0], ps[1], bb)
               obscured.push([ps[0], ps[1], bb])
-              @pdfwriter.circle_at(ps[0], ps[1], dotsize).fill
+              @pdfwriter.fill_circle([ps[0], ps[1]], dotsize)
               @pdfwriter.draw_text(stateInfo[0], :at => [ps[0] - 0.8333333*textRadius, 
                                      ps[1] + 1.25*dotsize], :size => fontsize)
             end
@@ -1319,7 +1324,6 @@ class AzimuthWriter
       @pdfwriter.line_width = 0.5*thinnestline
       @pdfwriter.stroke_color(WHITE)
       @pdfwriter.font("Helvetica")
-      @pdfwriter.text_render_style(2) # fill and then stroke
       File.open("cty.dat") { |inf|
         while (line = inf.gets)
           latitude = line[39,8].strip.to_f
@@ -1332,7 +1336,9 @@ class AzimuthWriter
           if polar[0] <= @radius
             psc = toPSCoord(polar)
             xadjust = -0.5*@pdfwriter.width_of(prefix, :size => prefixsize)
-            @pdfwriter.draw_text(prefix, :at => [psc[0]+xadjust, psc[1]], :size => prefixsize)
+            @pdfwriter.text_rendering_mode(:fill_stroke) {
+              @pdfwriter.draw_text(prefix, :at => [psc[0]+xadjust, psc[1]], :size => prefixsize)
+            }
           end
 
           while (line = inf.gets)
@@ -1353,10 +1359,10 @@ class AzimuthWriter
     dotsize = min(4.0*@printRadius/@radius,1.5)
     obscured = [ ]
     cutoff = calcCutoff
-    File.open("us_cities.txt") { |inf|
+    File.open("us_cities.txt", "r:iso-8859-1") { |inf|
       labelSites(inf, fontsize, dotsize, extra_space, obscured, cutoff)
     }
-    File.open("world_cities.txt") { |inf|
+    File.open("world_cities.txt", "r:iso-8859-1") { |inf|
       labelSites(inf, fontsize, dotsize, extra_space, obscured, cutoff)
     }
     clearOutsideMap
