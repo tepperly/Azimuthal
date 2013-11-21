@@ -632,11 +632,7 @@ class AzimuthWriter
   end
 
   def subtitlesize
-    if @radius < EARTHRADIUS*Math::PI
-      size = 18.0*(@printRadius / 260.0)
-    else
-      size = 24.0*(@printRadius / 260.0)
-    end
+    size = 18.0*(@printRadius / 260.0)
     STDFONTSIZES.each { |std|
       if std > size
         return std
