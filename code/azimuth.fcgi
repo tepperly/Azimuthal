@@ -19,6 +19,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 ENV['RUBY_GEMS'] = "/home8/brightly/ruby/gems"
+ENV['GEM_HOME'] = "/home8/brightly/ruby/gems"
 require 'rubygems'
 require 'sqlite3'
 require 'tempfile'
@@ -27,10 +28,10 @@ require 'prawn'
 require 'prawn/measurement_extensions'
 
 require 'fcgi'
-require 'anglecalc'
-require 'mapcalcs'
-require 'cgierror'
-require 'grid'
+load 'anglecalc.rb'
+load 'mapcalcs.rb'
+load 'cgierror.rb'
+load 'grid.rb'
 
 $ad = AngleDist.new
 # require 'basicops'
@@ -285,7 +286,7 @@ class AzimuthWriter
 
     height = @pdfwriter.margin_box.height
     @printRadius = 0.5*min(width, height) - 5
-    @center = [ 0.5*width, 0.5*height ]
+    @center = [ 0.5*width, height/GOLDENRATIO ]
     @radius = radius
     if blueBackground
       if @bwonly
@@ -991,7 +992,7 @@ class AzimuthWriter
               [ 'Nova Scotia', 44.0, -65.43],
               [ 'Nunavut', 64.0, -97.8],
               [ 'Ontario', 51.0, -87.0],
-              [ "Qu\351bec", 52.0, -71.6],
+              [ "Québec", 52.0, -71.6],
               [ 'Saskatchewan', 53.5, -106.2 ],
               [ 'Yukon Territory', 63.0, -136.0 ],
               ]
@@ -1377,7 +1378,8 @@ class AzimuthWriter
                        @latitude, @longitude)
       if polar[0] < @radius
         ps = toPSCoord(polar)
-        @pdfwriter.draw_text(state[0],
+        txt = state[0].encode("utf-8")
+        @pdfwriter.draw_text(txt,
                              :at => [ps[0]-0.5*@pdfwriter.width_of(state[0], :size => fontsize),
                                ps[1]], :size => fontsize)
       end
@@ -1426,11 +1428,11 @@ def lookupCity(city, region=nil)
     limit = 1000
   end
   result = nil
-  File.open("us_cities.txt") { |fin|
+  File.open("us_cities.txt", "r:iso-8859-1") { |fin|
     result = searchFile(fin, city, region, limit)
   }
   if not result
-    File.open("world_cities.txt") { |fin|
+    File.open("world_cities.txt", "r:iso-8859-1") { |fin|
       result = searchFile(fin, city, region, limit)
     }
   end
