@@ -7,8 +7,8 @@ require 'sqlite3'
 require 'fcgi'
 # require 'scruffy'
 require 'SVG/Graph/TimeSeries'
-require 'cgierror'
-require 'cgiparsedate'
+load 'cgierror.rb'
+load 'cgiparsedate.rb'
 
 def handleRequest(cgi)
   startingTime = parseDate(cgi["since"])

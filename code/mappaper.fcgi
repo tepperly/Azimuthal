@@ -7,8 +7,8 @@ require 'sqlite3'
 require 'fcgi'
 # require 'scruffy'
 require 'SVG/Graph/Pie'
-require 'cgierror'
-require 'cgiparsedate'
+load 'cgierror.rb'
+load 'cgiparsedate.rb'
 
 def in2pts(val)
   72 * val

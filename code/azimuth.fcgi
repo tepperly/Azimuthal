@@ -27,6 +27,14 @@ require 'tempfile'
 require 'prawn'
 require 'prawn/measurement_extensions'
 
+module Prawn
+  module Graphics
+    def set_clip_path
+      add_content "W* n"
+    end
+  end
+end
+
 require 'fcgi'
 load 'anglecalc.rb'
 load 'mapcalcs.rb'
@@ -286,7 +294,7 @@ class AzimuthWriter
 
     height = @pdfwriter.margin_box.height
     @printRadius = 0.5*min(width, height) - 5
-    @center = [ 0.5*width, height/GOLDENRATIO ]
+    @center = [ 0.5*width, height*0.5 ]
     @radius = radius
     if blueBackground
       if @bwonly
@@ -832,7 +840,9 @@ class AzimuthWriter
   end
 
   def gridsquarelabels
-    @pdfwriter.save_graphics_state do
+    @pdfwriter.save_graphics_state {
+      @pdfwriter.circle([@center[0], @center[1]], @printRadius)
+      @pdfwriter.set_clip_path
       @pdfwriter.line_width = thinnestline
       if @bwonly
         @pdfwriter.stroke_color(GRAY40)
@@ -865,7 +875,7 @@ class AzimuthWriter
           end
         }
       }
-    end
+    }
   end
 
   def latlonggrid
@@ -902,6 +912,7 @@ class AzimuthWriter
   def frame
     @pdfwriter.save_graphics_state do
       @pdfwriter.line_width = 2*thickline
+      @pdfwriter.cap_style = :butt
       @pdfwriter.fill_color(BLACK)
       @pdfwriter.translate(@center[0], @center[1]) {
         outer =  @printRadius+extraspace
@@ -945,7 +956,8 @@ class AzimuthWriter
           s = Math::sin(r)
           c = Math::cos(r)
           if (i % 6) == 0
-            @pdfwriter.move_to(0,0)
+            @pdfwriter.stroke_line([0, 0],
+                                   [@printRadius*c,@printRadius*s])
           elsif (i % 2) == 0
             @pdfwriter.stroke_line([0.25*@printRadius*c, 0.25*@printRadius*s],
                                    [@printRadius*c,@printRadius*s])
@@ -1245,20 +1257,23 @@ class AzimuthWriter
              ]
 
   def labelCountries
-    @pdfwriter.fill_color(GRAY50) # Color::RGB::Gray
-    @pdfwriter.font("Helvetica")
-    fontsize  =80.0*@printRadius/@radius
-    (COUNTRIES).each { |state|
-      polar = $ad.calc(state[1]*DEGTORAD, state[2]*DEGTORAD,
-                       @latitude, @longitude)
-      if polar[0] < @radius
-        ps = toPSCoord(polar)
-        @pdfwriter.draw_text(state[0],
-                             :at => [ps[0]-0.5*@pdfwriter.width_of(state[0], :size => fontsize*state[3]),
-                               ps[1]], :size => fontsize*state[3])
-      end
+    @pdfwriter.save_graphics_state {
+      @pdfwriter.circle([@center[0], @center[1]], @printRadius)
+      @pdfwriter.set_clip_path
+      @pdfwriter.fill_color(GRAY50) # Color::RGB::Gray
+      @pdfwriter.font("Helvetica")
+      fontsize  =80.0*@printRadius/@radius
+      (COUNTRIES).each { |state|
+        polar = $ad.calc(state[1]*DEGTORAD, state[2]*DEGTORAD,
+                         @latitude, @longitude)
+        if polar[0] < @radius
+          ps = toPSCoord(polar)
+          @pdfwriter.draw_text(state[0],
+                               :at => [ps[0]-0.5*@pdfwriter.width_of(state[0], :size => fontsize*state[3]),
+                                       ps[1]], :size => fontsize*state[3])
+        end
+      }
     }
-    clearOutsideMap
   end
 
   def isClear(list, x, y, bb)
@@ -1349,38 +1364,44 @@ class AzimuthWriter
   end
 
   def labelCities
-    extra_space = 1
-    @pdfwriter.fill_color(BLACK)
-    @pdfwriter.font("Helvetica")
-    fontsize = min(45.0*@printRadius/@radius,9)
-    dotsize = min(4.0*@printRadius/@radius,1.5)
-    obscured = [ ]
-    cutoff = calcCutoff
-    File.open("us_cities.txt", "r:iso-8859-1") { |inf|
-      labelSites(inf, fontsize, dotsize, extra_space, obscured, cutoff)
+    @pdfwriter.save_graphics_state {
+      @pdfwriter.circle([@center[0], @center[1]], @printRadius)
+      @pdfwriter.set_clip_path
+      extra_space = 1
+      @pdfwriter.fill_color(BLACK)
+      @pdfwriter.font("Helvetica")
+      fontsize = min(45.0*@printRadius/@radius,9)
+      dotsize = min(4.0*@printRadius/@radius,1.5)
+      obscured = [ ]
+      cutoff = calcCutoff
+      File.open("us_cities.txt", "r:iso-8859-1") { |inf|
+        labelSites(inf, fontsize, dotsize, extra_space, obscured, cutoff)
+      }
+      File.open("world_cities.txt", "r:iso-8859-1") { |inf|
+        labelSites(inf, fontsize, dotsize, extra_space, obscured, cutoff)
+      }
     }
-    File.open("world_cities.txt", "r:iso-8859-1") { |inf|
-      labelSites(inf, fontsize, dotsize, extra_space, obscured, cutoff)
-    }
-    clearOutsideMap
   end
 
   def labelStates
-    @pdfwriter.fill_color(BLACK)
-    @pdfwriter.font("Helvetica")
-    fontsize  =80.0*@printRadius/@radius
-    (USSTATES+CASTATES).each { |state|
-      polar = $ad.calc(state[1]*DEGTORAD, state[2]*DEGTORAD,
-                       @latitude, @longitude)
-      if polar[0] < @radius
-        ps = toPSCoord(polar)
-        txt = state[0].encode("utf-8")
-        @pdfwriter.draw_text(txt,
-                             :at => [ps[0]-0.5*@pdfwriter.width_of(state[0], :size => fontsize),
-                               ps[1]], :size => fontsize)
-      end
+    @pdfwriter.save_graphics_state {
+      @pdfwriter.circle([@center[0], @center[1]], @printRadius)
+      @pdfwriter.set_clip_path
+      @pdfwriter.fill_color(BLACK)
+      @pdfwriter.font("Helvetica")
+      fontsize  =80.0*@printRadius/@radius
+      (USSTATES+CASTATES).each { |state|
+        polar = $ad.calc(state[1]*DEGTORAD, state[2]*DEGTORAD,
+                         @latitude, @longitude)
+        if polar[0] < @radius
+          ps = toPSCoord(polar)
+          txt = state[0].encode("utf-8")
+          @pdfwriter.draw_text(txt,
+                               :at => [ps[0]-0.5*@pdfwriter.width_of(state[0], :size => fontsize),
+                                       ps[1]], :size => fontsize)
+        end
+      }
     }
-    clearOutsideMap
   end
 end
 
