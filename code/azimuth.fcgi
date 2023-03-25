@@ -42,6 +42,7 @@ load 'cgierror.rb'
 load 'grid.rb'
 
 $ad = AngleDist.new
+$cgv = { }
 # require 'basicops'
 
 BLACK = "000000"
@@ -921,7 +922,7 @@ class AzimuthWriter
           r = i*DEGTORAD
           s = Math::sin(r)
           c = Math::cos(r)
-          if ((i % 10) == 0)
+          if (((i % 10) == 0) && ("on" != $cgv["pstrotator"]))
             numstr = ((90 - i) % 360).to_s 
             label = numstr + "°"
             w = 0.5*@pdfwriter.width_of(numstr, :size => labelsize)
@@ -958,10 +959,10 @@ class AzimuthWriter
           if (i % 6) == 0
             @pdfwriter.stroke_line([0, 0],
                                    [@printRadius*c,@printRadius*s])
-          elsif (i % 2) == 0
+          elsif (i % 2) == 0 and ("on" != $cgv["pstrotator"])
             @pdfwriter.stroke_line([0.25*@printRadius*c, 0.25*@printRadius*s],
                                    [@printRadius*c,@printRadius*s])
-          else
+          elsif "on" != $cgv["pstrotator"]
             @pdfwriter.stroke_line([0.5*@printRadius*c, 0.5*@printRadius*s],
                                    [@printRadius*c,@printRadius*s])
           end
@@ -1532,20 +1533,19 @@ end
 
 def handleRequest(cgi)
   f = open("output.txtd", "w")
-  cgv = { }
   cgi.params.each { |k,v|
     v = v[0]
 #    f.write(k + "|" + v.class.to_s + "|" + v.to_s + "\n")
 #    if v.instance_of?(Array)
 #      f.write(v.length.to_s + "\n")
     if v.instance_of?(StringIO)
-      cgv[k] = v.read
+      $cgv[k] = v.read
     elsif v.instance_of?(Tempfile)
       if v.length <= 10000000       # only up to 10 million bytes
-        cgv[k] = v.read
+        $cgv[k] = v.read
       end
     else
-      cgv[k] = v
+      $cgv[k] = v
     end
   }
   f.close
@@ -1554,31 +1554,32 @@ def handleRequest(cgi)
   if db
     begin
       db.busy_timeout(150)
-      db.execute("CREATE TABLE if not exists log (id integer primary key autoincrement, title text, paper text, bluefill tinyint, view tinyint, countries tinyint, cities tinyint, distance text, location text, datetime bigint, iploc tinyint, referrer text, success tinyint, blackwhite tinyint, latlonglines tinyint, gridsquarelabels tinyint)")
-      db.execute("insert into log (title, paper, bluefill, view, countries, cities, distance, location, iploc, referrer, datetime, blackwhite, latlonglines, gridsquarelabels) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                 cgv['title'],
-                 cgv['paper'],
-                 bool(cgv['bluefill']),
-                 bool(cgv['view']),
-                 bool(cgv['countries']),
-                 bool(cgv['uscities']),
-                 cgv['distance'],
-                 cgv['location'],
-                 bool(cgv['iplocationused']),
+      db.execute("CREATE TABLE if not exists log (id integer primary key autoincrement, title text, paper text, bluefill tinyint, view tinyint, countries tinyint, cities tinyint, distance text, location text, datetime bigint, iploc tinyint, referrer text, success tinyint, blackwhite tinyint, latlonglines tinyint, gridsquarelabels tinyint, pstrotator tinyint)")
+      db.execute("insert into log (title, paper, bluefill, view, countries, cities, distance, location, iploc, referrer, datetime, blackwhite, latlonglines, gridsquarelabels, pstrotator) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                 $cgv['title'],
+                 $cgv['paper'],
+                 bool($cgv['bluefill']),
+                 bool($cgv['view']),
+                 bool($cgv['countries']),
+                 bool($cgv['uscities']),
+                 $cgv['distance'],
+                 $cgv['location'],
+                 bool($cgv['iplocationused']),
                  cgi.referer, Time.now.to_i,
-                 bool(cgv['bw']),
-                 bool(cgv['latlong']),
-                 bool(cgv['gridsquares']))
+                 bool($cgv['bw']),
+                 bool($cgv['latlong']),
+                 bool($cgv['gridsquares']),
+                 bool($cgv['pstrotator']))
       id = db.get_first_value("select last_insert_rowid()")
       
       lettersize = "LETTER"
       errors = [ ]
-      if cgv["paper"] and KNOWNPAPER[cgv["paper"]]
-        lettersize = KNOWNPAPER[cgv["paper"]]
+      if $cgv["paper"] and KNOWNPAPER[$cgv["paper"]]
+        lettersize = KNOWNPAPER[$cgv["paper"]]
       else
-        errors << ("PAPER\nPaper argument is wrong '" + cgv["paper"] + "'\n")
+        errors << ("PAPER\nPaper argument is wrong '" + $cgv["paper"] + "'\n")
       end
-      location = cgv["location"].strip
+      location = $cgv["location"].strip
       if location =~ MAIDENHEADREGEX
         latlong = maidenheadToLatLong($1)
         latitude = latlong[0]
@@ -1652,17 +1653,17 @@ def handleRequest(cgi)
       else
         errors << LOCATIONHELP
       end
-      distance = cgv["distance"].to_f
+      distance = $cgv["distance"].to_f
       if distance > EARTHRADIUS*Math::PI || distance == 0
         distance = EARTHRADIUS*Math::PI
       end
       
       title = "Azimuthal Map"
       
-      if not titleOkay(cgv["title"])
+      if not titleOkay($cgv["title"])
         errors << "TITLE\nTitle has illegal characters.\n"
       else
-        title = cgv["title"]
+        title = $cgv["title"]
       end
 
 
@@ -1672,50 +1673,54 @@ def handleRequest(cgi)
                    0, Time.now.to_i, id)
       else
         foo = AzimuthWriter.new(distance, lettersize, latitude*DEGTORAD,
-                                longitude*DEGTORAD,"on"==cgv["bluefill"], title,
-                                "on"==cgv["bw"])
+                                longitude*DEGTORAD,"on"==$cgv["bluefill"], title,
+                                "on"==$cgv["bw"])
 
         
         File.open("corrected.azb") { |inf|
           foo.traceFile(inf)
         }
-        File.open("nations.azb") { |inf|
-          foo.traceLines(inf)
-        }
-        File.open("states.azb") { |inf|
-          foo.traceLines(inf)
-        }
-        if cgv.has_key?("kmlfile")
-          foo.markLandmarks(cgv["kmlfile"])
+        if ("on" != $cgv["pstrotator"])
+          File.open("nations.azb") { |inf|
+            foo.traceLines(inf)
+          }
+          File.open("states.azb") { |inf|
+            foo.traceLines(inf)
+          }
         end
-        if "on" == cgv["latlong"]
+        if $cgv.has_key?("kmlfile")
+          foo.markLandmarks($cgv["kmlfile"])
+        end
+        if "on" == $cgv["latlong"]
           foo.latlonggrid
         end
-        if "on" == cgv["gridsquares"]
+        if "on" == $cgv["gridsquares"]
           foo.gridsquarelabels
         end
-        if "on" == cgv["countries"]
+        if "on" == $cgv["countries"]
           foo.labelCountries
         end
-        if "on" == cgv["states"]
+        if "on" == $cgv["states"]
           foo.labelStates
         end
-        if "on" == cgv["uscities"]
+        if "on" == $cgv["uscities"]
           foo.labelCities
         end
-        if "on" == cgv["prefixlabels"]
+        if "on" == $cgv["prefixlabels"]
           foo.labelPrefixes
         end
         headers = { "type" => "application/octet" }
-        if "on" == cgv["view"]
+        if "on" == $cgv["view"]
           headers["type"] = "application/pdf"
           headers["content-disposition"] = "inline; filename=AzimuthalMap.pdf"
         else
           headers["content-disposition"] = "attachment; filename=AzimuthalMap.pdf"
         end
         foo.frame
-        foo.heading
-        foo.footer
+        if ("on" != $cgv["pstrotator"])
+          foo.heading
+          foo.footer
+        end
         # foo.dump(File.open("test.pdf", "wb"))
         contents =   foo.render
         cgi.out(headers) {
