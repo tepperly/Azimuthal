@@ -909,7 +909,7 @@ class AzimuthWriter
   end
 
 
-  def frame
+  def frame(minimumFrame)
     @pdfwriter.save_graphics_state do
       @pdfwriter.line_width = 2*thickline
       @pdfwriter.cap_style = :butt
@@ -921,7 +921,7 @@ class AzimuthWriter
           r = i*DEGTORAD
           s = Math::sin(r)
           c = Math::cos(r)
-          if ((i % 10) == 0)
+          if (((i % 10) == 0) and not minimumFrame)
             numstr = ((90 - i) % 360).to_s 
             label = numstr + "°"
             w = 0.5*@pdfwriter.width_of(numstr, :size => labelsize)
@@ -958,10 +958,10 @@ class AzimuthWriter
           if (i % 6) == 0
             @pdfwriter.stroke_line([0, 0],
                                    [@printRadius*c,@printRadius*s])
-          elsif (i % 2) == 0
+          elsif (i % 2) == 0 and not minimumFrame
             @pdfwriter.stroke_line([0.25*@printRadius*c, 0.25*@printRadius*s],
                                    [@printRadius*c,@printRadius*s])
-          else
+          elsif not minimumFrame
             @pdfwriter.stroke_line([0.5*@printRadius*c, 0.5*@printRadius*s],
                                    [@printRadius*c,@printRadius*s])
           end
@@ -1554,8 +1554,8 @@ def handleRequest(cgi)
   if db
     begin
       db.busy_timeout(150)
-      db.execute("CREATE TABLE if not exists log (id integer primary key autoincrement, title text, paper text, bluefill tinyint, view tinyint, countries tinyint, cities tinyint, distance text, location text, datetime bigint, iploc tinyint, referrer text, success tinyint, blackwhite tinyint, latlonglines tinyint, gridsquarelabels tinyint)")
-      db.execute("insert into log (title, paper, bluefill, view, countries, cities, distance, location, iploc, referrer, datetime, blackwhite, latlonglines, gridsquarelabels) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      db.execute("CREATE TABLE if not exists log (id integer primary key autoincrement, title text, paper text, bluefill tinyint, view tinyint, countries tinyint, cities tinyint, distance text, location text, datetime bigint, iploc tinyint, referrer text, success tinyint, blackwhite tinyint, latlonglines tinyint, gridsquarelabels tinyint, pstrotator tinyint)")
+      db.execute("insert into log (title, paper, bluefill, view, countries, cities, distance, location, iploc, referrer, datetime, blackwhite, latlonglines, gridsquarelabels, pstrotator) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                  cgv['title'],
                  cgv['paper'],
                  bool(cgv['bluefill']),
@@ -1568,7 +1568,8 @@ def handleRequest(cgi)
                  cgi.referer, Time.now.to_i,
                  bool(cgv['bw']),
                  bool(cgv['latlong']),
-                 bool(cgv['gridsquares']))
+                 bool(cgv['gridsquares']),
+                 bool(cgv['pstrotator']))
       id = db.get_first_value("select last_insert_rowid()")
       
       lettersize = "LETTER"
@@ -1679,12 +1680,14 @@ def handleRequest(cgi)
         File.open("corrected.azb") { |inf|
           foo.traceFile(inf)
         }
-        File.open("nations.azb") { |inf|
-          foo.traceLines(inf)
-        }
-        File.open("states.azb") { |inf|
-          foo.traceLines(inf)
-        }
+        if ("on" != cgv["pstrotator"])
+          File.open("nations.azb") { |inf|
+            foo.traceLines(inf)
+          }
+          File.open("states.azb") { |inf|
+            foo.traceLines(inf)
+          }
+        end
         if cgv.has_key?("kmlfile")
           foo.markLandmarks(cgv["kmlfile"])
         end
@@ -1713,9 +1716,11 @@ def handleRequest(cgi)
         else
           headers["content-disposition"] = "attachment; filename=AzimuthalMap.pdf"
         end
-        foo.frame
-        foo.heading
-        foo.footer
+        foo.frame("on" == cgv["psrotator"])
+        if ("on" != cgv["pstrotator"])
+          foo.heading
+          foo.footer
+        end
         # foo.dump(File.open("test.pdf", "wb"))
         contents =   foo.render
         cgi.out(headers) {
